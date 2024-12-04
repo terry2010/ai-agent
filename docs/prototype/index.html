@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent 原型</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <header>
+            <div class="menu">
+                <button class="settings-btn">⚙️ 设置</button>
+            </div>
+            <div class="model-status">
+                <span class="status-dot"></span>
+                <span class="status-text">模型已连接</span>
+            </div>
+        </header>
+        
+        <main>
+            <aside class="sidebar">
+                <div class="model-select">
+                    <select>
+                        <option>GPT-3.5</option>
+                        <option>Claude-2</option>
+                        <option>Llama-2</option>
+                    </select>
+                </div>
+                <div class="history">
+                    <div class="history-item active">对话 1</div>
+                    <div class="history-item">对话 2</div>
+                    <div class="history-item">对话 3</div>
+                </div>
+            </aside>
+
+            <section class="chat-area">
+                <div class="messages" id="messages">
+                    <div class="message ai">
+                        <div class="message-content">
+                            您好！我是AI助手，有什么我可以帮您的吗？
+                        </div>
+                    </div>
+                </div>
+                <div class="input-area">
+                    <textarea placeholder="请输入您的问题..." id="userInput"></textarea>
+                    <div class="buttons">
+                        <button class="send-btn" onclick="sendMessage()">发送</button>
+                        <button class="clear-btn" onclick="clearInput()">清空</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
