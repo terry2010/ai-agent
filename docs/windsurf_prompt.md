@@ -8,4 +8,5 @@
 
 分析readme 和docs里的开发计划 ，并分析docs里的html格式原型， 看看原型里和readme的功能有什么区别
 
+分析readme 和docs里的开发计划 ，并分析docs里的html格式原型， 分析已有代码，改用yarn后，继续第一天的开发
 
