@@ -10,7 +10,9 @@
     <div class="app">
         <header>
             <div class="menu">
-                <button class="settings-btn">⚙️ 设置</button>
+                <button class="settings-btn" onclick="toggleSettings()">⚙️ 设置</button>
+                <button class="file-btn" onclick="toggleFilePanel()">📁 文件</button>
+                <button class="log-btn" onclick="toggleLogs()">📋 日志</button>
             </div>
             <div class="model-status">
                 <span class="status-dot"></span>
@@ -19,12 +21,74 @@
         </header>
         
         <main>
+            <!-- 设置面板 -->
+            <div class="settings-panel" id="settingsPanel">
+                <h3>设置</h3>
+                <div class="settings-group">
+                    <h4>本地模型配置</h4>
+                    <div class="setting-item">
+                        <label>Ollama 路径:</label>
+                        <input type="text" value="http://localhost:11434" />
+                    </div>
+                    <div class="setting-item">
+                        <label>模型名称:</label>
+                        <input type="text" value="llama2" />
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h4>界面设置</h4>
+                    <div class="setting-item">
+                        <label>主题:</label>
+                        <select>
+                            <option>浅色</option>
+                            <option>深色</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 文件面板 -->
+            <div class="file-panel" id="filePanel">
+                <h3>文件操作</h3>
+                <div class="file-actions">
+                    <button onclick="simulateFileRead()">读取文件</button>
+                    <button onclick="simulateFileWrite()">写入文件</button>
+                </div>
+                <div class="file-list">
+                    <div class="file-item">
+                        <span>📄 main.py</span>
+                        <div class="file-actions">
+                            <button>查看</button>
+                            <button>编辑</button>
+                        </div>
+                    </div>
+                    <div class="file-item">
+                        <span>📄 config.json</span>
+                        <div class="file-actions">
+                            <button>查看</button>
+                            <button>编辑</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 日志面板 -->
+            <div class="log-panel" id="logPanel">
+                <h3>系统日志</h3>
+                <div class="log-content">
+                    <div class="log-entry info">INFO: 系统启动</div>
+                    <div class="log-entry info">INFO: 模型加载成功</div>
+                    <div class="log-entry warning">WARN: 文件操作耗时较长</div>
+                    <div class="log-entry error">ERROR: 模型连接失败</div>
+                </div>
+            </div>
+
             <aside class="sidebar">
                 <div class="model-select">
-                    <select>
-                        <option>GPT-3.5</option>
-                        <option>Claude-2</option>
-                        <option>Llama-2</option>
+                    <select onchange="handleModelChange(this.value)">
+                        <option value="local">Llama2 (本地)</option>
+                        <option value="gpt">GPT-3.5</option>
+                        <option value="claude">Claude-2</option>
                     </select>
                 </div>
                 <div class="history">
@@ -41,8 +105,29 @@
                             您好！我是AI助手，有什么我可以帮您的吗？
                         </div>
                     </div>
+                    <!-- 示例消息，展示不同类型的渲染 -->
+                    <div class="message user">
+                        <div class="message-content">
+                            请帮我分析这段代码
+                        </div>
+                    </div>
+                    <div class="message ai">
+                        <div class="message-content">
+                            好的，让我来分析这段代码：
+                            <pre><code class="language-python">def hello_world():
+    print("Hello, World!")
+    return True</code></pre>
+                            这是一个简单的Python函数，它：
+                            1. 打印"Hello, World!"
+                            2. 返回True
+                        </div>
+                    </div>
                 </div>
                 <div class="input-area">
+                    <div class="input-toolbar">
+                        <button onclick="uploadFile()">📎 上传文件</button>
+                        <button onclick="insertCodeBlock()">📝 插入代码块</button>
+                    </div>
                     <textarea placeholder="请输入您的问题..." id="userInput"></textarea>
                     <div class="buttons">
                         <button class="send-btn" onclick="sendMessage()">发送</button>
@@ -51,6 +136,14 @@
                 </div>
             </section>
         </main>
+
+        <!-- 错误提示 -->
+        <div class="toast" id="toast">
+            <div class="toast-content">
+                <span class="toast-icon">⚠️</span>
+                <span class="toast-message">操作失败，请重试</span>
+            </div>
+        </div>
     </div>
     <script src="script.js"></script>
 </body>

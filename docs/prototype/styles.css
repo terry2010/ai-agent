@@ -197,3 +197,181 @@ code {
     font-family: 'Courier New', Courier, monospace;
     font-size: 14px;
 }
+
+/* 面板通用样式 */
+.settings-panel,
+.file-panel,
+.log-panel {
+    position: fixed;
+    top: 60px;
+    right: -300px;
+    width: 300px;
+    height: calc(100vh - 60px);
+    background: white;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    transition: right 0.3s ease;
+    z-index: 1000;
+    overflow-y: auto;
+}
+
+.settings-panel.active,
+.file-panel.active,
+.log-panel.active {
+    right: 0;
+}
+
+/* 设置面板样式 */
+.settings-group {
+    margin-bottom: 20px;
+}
+
+.settings-group h4 {
+    margin-bottom: 10px;
+    color: #666;
+}
+
+.setting-item {
+    margin-bottom: 15px;
+}
+
+.setting-item label {
+    display: block;
+    margin-bottom: 5px;
+    color: #333;
+}
+
+.setting-item input,
+.setting-item select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* 文件面板样式 */
+.file-actions {
+    margin-bottom: 15px;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.file-item button {
+    padding: 4px 8px;
+    margin-left: 8px;
+    font-size: 12px;
+}
+
+/* 日志面板样式 */
+.log-content {
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.log-entry {
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.log-entry.info {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.log-entry.warning {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.log-entry.error {
+    background: #ffebee;
+    color: #d32f2f;
+}
+
+/* 输入工具栏 */
+.input-toolbar {
+    margin-bottom: 10px;
+}
+
+.input-toolbar button {
+    background: none;
+    border: 1px solid #ddd;
+    margin-right: 8px;
+    padding: 6px 12px;
+}
+
+.input-toolbar button:hover {
+    background: #f5f5f5;
+}
+
+/* Toast 提示 */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 4px;
+    display: none;
+}
+
+.toast.show {
+    display: block;
+    animation: fadeInOut 3s ease;
+}
+
+.toast-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* 调整顶部按钮样式 */
+.menu button {
+    margin-right: 10px;
+}
+
+/* 代码块样式增强 */
+pre {
+    position: relative;
+}
+
+pre::after {
+    content: "复制";
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+pre:hover::after {
+    opacity: 1;
+}
