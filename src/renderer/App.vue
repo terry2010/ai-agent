@@ -4,7 +4,7 @@
       <!-- 顶部状态栏 -->
       <el-header height="50px">
         <div class="header-left">
-          <el-button>设置</el-button>
+          <el-button @click="showSettings = true">设置</el-button>
         </div>
         <div class="header-right">
           <span class="model-status">
@@ -75,21 +75,38 @@
         </el-main>
       </el-container>
     </el-container>
+    
+    <!-- 设置对话框 -->
+    <SettingsDialog
+      v-model:visible="showSettings"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useChatStore } from './stores/chat'
+import { useSettingsStore } from './stores/settings'
 import ChatMessage from './components/ChatMessage.vue'
+import SettingsDialog from './components/SettingsDialog.vue'
 
 const chatStore = useChatStore()
+const settingsStore = useSettingsStore()
 const inputMessage = ref('')
 const modelConnected = ref(false)
 const selectedModel = ref('codellama')
+const showSettings = ref(false)
 
 // 初始化
 onMounted(async () => {
+  // 加载设置
+  const settings = settingsStore.getSettings()
+  if (settings) {
+    selectedModel.value = settings.defaultModel
+    settingsStore.applySettings(settings)
+  }
+  
+  // 检查模型状态
   modelConnected.value = await chatStore.checkModelStatus()
   if (!chatStore.currentConversationId) {
     chatStore.createNewConversation()
@@ -136,6 +153,7 @@ function clearInput() {
 <style>
 .app-container {
   height: 100vh;
+  background-color: #f5f7fa;
 }
 
 .el-header {
@@ -143,6 +161,14 @@ function clearInput() {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid #dcdfe6;
+  background-color: #fff;
+  padding: 0 20px;
+}
+
+.el-aside {
+  background-color: #fff;
+  border-right: 1px solid #dcdfe6;
+  padding: 20px;
 }
 
 .model-select {
@@ -151,36 +177,61 @@ function clearInput() {
 }
 
 .new-chat-btn {
-  width: calc(100% - 20px);
-  margin: 10px;
+  width: 100%;
+  margin-top: 20px;
 }
 
 .chat-messages {
-  flex: 1;
+  height: calc(100vh - 250px);
   overflow-y: auto;
   padding: 20px;
 }
 
 .input-area {
+  position: fixed;
+  bottom: 0;
+  left: 200px;
+  right: 0;
   padding: 20px;
+  background-color: #fff;
   border-top: 1px solid #dcdfe6;
 }
 
 .input-buttons {
-  margin-top: 10px;
   display: flex;
   justify-content: flex-end;
+  margin-top: 10px;
   gap: 10px;
 }
 
-.el-aside {
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid #dcdfe6;
+.el-main {
+  padding: 0;
+  position: relative;
 }
 
-.el-menu {
-  flex: 1;
-  overflow-y: auto;
+.header-left, .header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.model-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+:deep(.el-menu) {
+  border-right: none;
+  margin-top: 20px;
+}
+
+:deep(.el-menu-item) {
+  border-radius: 4px;
+  margin: 5px 0;
+}
+
+:deep(.el-menu-item.is-active) {
+  background-color: #ecf5ff;
 }
 </style>

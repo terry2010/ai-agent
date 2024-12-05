@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "axios": "^1.6.2",
+    "electron-store": "^10.0.0",
     "element-plus": "^2.3.8",
     "highlight.js": "^11.8.0",
     "marked": "^5.1.1",

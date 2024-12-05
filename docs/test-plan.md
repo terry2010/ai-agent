@@ -9,7 +9,7 @@
 - Chrome DevTools
 
 ### 测试工具
-- Jest 单元测试
+- vitest 单元测试
 - Cypress E2E测试
 - Chrome DevTools 性能分析
 - Postman API测试

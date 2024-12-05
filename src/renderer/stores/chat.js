@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { checkOllamaStatus, generateResponse } from '../utils/ipc'
+import { handleError, ErrorTypes } from '../utils/error'
 
 export const useChatStore = defineStore('chat', () => {
   const messages = ref([])
@@ -11,8 +12,14 @@ export const useChatStore = defineStore('chat', () => {
 
   // 检查模型状态
   async function checkModelStatus() {
-    modelConnected.value = await checkOllamaStatus()
-    return modelConnected.value
+    try {
+      modelConnected.value = await checkOllamaStatus()
+      return modelConnected.value
+    } catch (error) {
+      handleError(error, ErrorTypes.MODEL_CONNECTION)
+      modelConnected.value = false
+      return false
+    }
   }
 
   function addMessage(message) {
@@ -39,9 +46,9 @@ export const useChatStore = defineStore('chat', () => {
         isAI: true
       })
     } catch (error) {
-      console.error('Error getting AI response:', error)
+      handleError(error, ErrorTypes.API_ERROR)
       addMessage({
-        content: '抱歉，生成响应时出现错误。',
+        content: '抱歉，生成响应时出现错误。请检查模型连接状态或稍后重试。',
         isAI: true
       })
     }
