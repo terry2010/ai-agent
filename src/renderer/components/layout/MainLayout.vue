@@ -34,32 +34,34 @@
             </el-select>
             
             <div class="history-list">
-              <div class="history-header">
-                <span class="history-title">历史记录</span>
-                <el-button 
-                  type="primary" 
-                  size="small" 
-                  text 
-                  @click="createNewChat">
-                  新对话
-                </el-button>
+              <div class="sidebar-header">
+                <el-button type="primary" class="w-100" @click="createNewChat">新建会话</el-button>
               </div>
-              
               <el-scrollbar>
-                <div v-for="chat in chatStore.conversations" 
-                     :key="chat.id" 
-                     class="history-item"
-                     :class="{ active: chat.id === chatStore.currentConversationId }"
-                     @click="selectConversation(chat.id)">
-                  <span class="title">{{ chat.title || '新对话' }}</span>
-                  <el-button 
-                    type="danger" 
-                    size="small" 
-                    text
-                    @click.stop="confirmDelete(chat)">
-                    <i class="el-icon-delete" />
-                  </el-button>
-                </div>
+                <el-menu
+                  :default-active="chatStore.currentConversationId"
+                  class="chat-list"
+                  @select="selectConversation"
+                >
+                  <el-menu-item
+                    v-for="chat in chatStore.conversations"
+                    :key="chat.id"
+                    :index="chat.id"
+                    class="chat-item"
+                  >
+                    <div class="chat-item-content">
+                      <span class="chat-title">{{ chat.title || '新会话' }}</span>
+                      <el-button
+                        class="delete-btn"
+                        type="danger"
+                        link
+                        @click.stop="confirmDelete(chat)"
+                      >
+                        <el-icon><Delete /></el-icon>
+                      </el-button>
+                    </div>
+                  </el-menu-item>
+                </el-menu>
               </el-scrollbar>
             </div>
           </el-tab-pane>
@@ -75,30 +77,6 @@
         <chat-view ref="chatViewRef" />
       </el-main>
     </el-container>
-
-    <!-- 删除确认对话框 -->
-    <el-dialog
-      v-model="showDeleteConfirm"
-      title="确认删除"
-      width="360px"
-      class="delete-dialog"
-      :modal-class="'delete-dialog-modal'"
-      :close-on-click-modal="false"
-      align-center>
-      <div class="delete-dialog-content">
-        <el-icon class="warning-icon"><Warning /></el-icon>
-        <span>确定要删除对话 "{{ chatToDelete?.title }}" 吗？</span>
-        <div class="delete-warning">此操作不可恢复</div>
-      </div>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button plain @click="showDeleteConfirm = false">取消</el-button>
-          <el-button type="danger" @click="deleteChat">
-            确定删除
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
 
     <!-- 错误提示 -->
     <el-alert
@@ -121,14 +99,11 @@ import ModelManager from '../../components/model/ModelManager.vue'
 import ChatView from '../../components/chat/ChatView.vue'
 import { ElMessageBox } from 'element-plus'
 import { Warning } from '@element-plus/icons-vue'
+import { Delete } from '@element-plus/icons-vue'
 
 // 初始化 stores
 const modelStore = useModelStore()
 const chatStore = useChatStore()
-
-// 删除对话相关
-const showDeleteConfirm = ref(false)
-const chatToDelete = ref(null)
 
 // 标签页相关
 const activeTab = ref('chat')
@@ -154,9 +129,28 @@ onMounted(async () => {
   await modelStore.fetchModels()
 })
 
-// 创建新对话
-const createNewChat = () => {
-  chatStore.createConversation()
+// 确认删除对话
+const confirmDelete = async (chat) => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要删除这个会话吗？此操作不可恢复。',
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+        icon: Warning
+      }
+    )
+    await chatStore.deleteConversation(chat.id)
+  } catch {
+    // 用户取消删除
+  }
+}
+
+// 创建新会话
+const createNewChat = async () => {
+  await chatStore.createConversation()
 }
 
 // 选择对话
@@ -166,21 +160,6 @@ const selectConversation = async (chatId) => {
   nextTick(() => {
     chatViewRef.value?.jumpToBottom()
   })
-}
-
-// 确认删除对话
-const confirmDelete = (chat) => {
-  chatToDelete.value = chat
-  showDeleteConfirm.value = true
-}
-
-// 删除对话
-const deleteChat = () => {
-  if (chatToDelete.value) {
-    chatStore.deleteConversation(chatToDelete.value.id)
-    showDeleteConfirm.value = false
-    chatToDelete.value = null
-  }
 }
 
 const chatViewRef = ref(null)
@@ -245,20 +224,25 @@ const chatViewRef = ref(null)
   flex-direction: column;
 }
 
-.history-header {
+.sidebar-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  margin-bottom: 8px;
+  padding: 16px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.sidebar-header .el-button {
+  width: 100%;
+}
+
+.chat-list {
+  height: 100%;
+  overflow: auto;
   padding: 0 8px;
 }
 
-.history-title {
-  font-size: 14px;
-  color: var(--el-text-color-secondary);
-}
-
-.history-item {
+.chat-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -269,13 +253,15 @@ const chatViewRef = ref(null)
   transition: all 0.2s;
 }
 
-.history-item:hover {
+.chat-item:hover {
   background-color: var(--el-fill-color-light);
 }
 
-.history-item.active {
-  background-color: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
+.chat-item-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
 }
 
 .chat-title {
@@ -290,7 +276,7 @@ const chatViewRef = ref(null)
   transition: opacity 0.2s;
 }
 
-.history-item:hover .delete-btn {
+.chat-item:hover .delete-btn {
   opacity: 1;
 }
 
@@ -316,77 +302,5 @@ const chatViewRef = ref(null)
 :deep(.el-select-dropdown__item small) {
   font-size: 12px;
   margin-top: 2px;
-}
-
-/* 删除确认对话框样式 */
-:deep(.delete-dialog) {
-  border-radius: 8px;
-  overflow: hidden;
-  background: white;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-:deep(.delete-dialog .el-dialog__header) {
-  margin: 0;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  background: white;
-}
-
-:deep(.delete-dialog .el-dialog__body) {
-  background: white;
-  padding: 0;
-}
-
-:deep(.delete-dialog .el-dialog__headerbtn) {
-  top: 16px;
-}
-
-.delete-dialog-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 24px 20px;
-  text-align: center;
-  background: white;
-}
-
-.warning-icon {
-  font-size: 24px;
-  color: var(--el-color-danger);
-  margin-bottom: 16px;
-}
-
-.delete-warning {
-  margin-top: 8px;
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-
-:deep(.delete-dialog .el-dialog__footer) {
-  padding: 16px 20px;
-  border-top: 1px solid var(--el-border-color-lighter);
-  margin: 0;
-  background: white;
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-:deep(.delete-dialog-modal) {
-  background-color: rgba(0, 0, 0, 0.65);
-}
-
-:deep(.dialog-footer .el-button--plain) {
-  border-color: var(--el-border-color-lighter);
-  color: var(--el-text-color-regular);
-}
-
-:deep(.dialog-footer .el-button--danger) {
-  border: none;
-  padding: 8px 16px;
 }
 </style>

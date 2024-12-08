@@ -1,7 +1,7 @@
 <template>
   <div class="chat-container">
     <!-- 消息列表区域 -->
-    <div class="message-list" :class="{ 'smooth-scroll': shouldAutoScroll }" ref="messageListRef">
+    <el-scrollbar ref="messageListRef" class="message-list" :class="{ 'smooth-scroll': shouldAutoScroll }" @scroll="onScroll">
       <template v-for="message in currentMessages" :key="message.id">
         <div v-if="message.content && message.content.trim()" class="message" :class="message.role">
           <div class="message-content" v-html="renderMarkdown(message.content || '')"></div>
@@ -22,7 +22,7 @@
           </div>
         </div>
       </template>
-    </div>
+    </el-scrollbar>
 
     <!-- 输入区域 -->
     <div class="input-container">
@@ -78,7 +78,6 @@
 
 .message-list {
   flex: 1;
-  overflow-y: auto;
   padding: 20px;
   box-sizing: border-box;
 }
@@ -236,11 +235,11 @@ const jumpToBottom = () => {
   const messageList = messageListRef.value
   if (messageList) {
     // 临时禁用平滑滚动
-    messageList.style.scrollBehavior = 'auto'
-    messageList.scrollTop = messageList.scrollHeight
+    messageList.$el.style.scrollBehavior = 'auto'
+    messageList.setScrollTop(messageList.wrapRef.scrollHeight)
     // 恢复默认行为
     requestAnimationFrame(() => {
-      messageList.style.scrollBehavior = ''
+      messageList.$el.style.scrollBehavior = ''
     })
   }
 }
@@ -254,42 +253,44 @@ const scrollToBottom = async () => {
   // 如果在底部或最新用户消息可见，则滚动到底部
   if (isNearBottom() || isLatestUserMessageVisible()) {
     shouldAutoScroll.value = true
-    messageList.scrollTop = messageList.scrollHeight
+    messageList.setScrollTop(messageList.wrapRef.scrollHeight)
   }
 }
 
-// 暴露方法给父组件
-defineExpose({
-  jumpToBottom
-})
+// 判断是否接近底部
+const isNearBottom = () => {
+  const messageList = messageListRef.value
+  if (!messageList) return false
+
+  const { scrollTop, clientHeight, scrollHeight } = messageList.wrapRef
+  return scrollHeight - (scrollTop + clientHeight) <= 100
+}
 
 // 判断最新的用户消息是否可见
 const isLatestUserMessageVisible = () => {
   const messageList = messageListRef.value
   if (!messageList) return false
 
-  // 找到最新的用户消息元素
-  const userMessages = messageList.querySelectorAll('.message.user')
-  if (userMessages.length === 0) return false
-  const latestUserMessage = userMessages[userMessages.length - 1]
+  const messages = currentMessages.value
+  const lastUserMessageIndex = findLastIndex(messages, m => m.role === 'user')
+  if (lastUserMessageIndex === -1) return false
 
-  // 获取消息列表的可视区域
-  const listRect = messageList.getBoundingClientRect()
-  const messageRect = latestUserMessage.getBoundingClientRect()
+  const messageElements = messageList.$el.querySelectorAll('.message')
+  const lastUserMessage = messageElements[lastUserMessageIndex]
+  if (!lastUserMessage) return false
 
-  // 检查消息是否在可视区域内
-  return messageRect.top >= listRect.top && messageRect.bottom <= listRect.bottom
+  const containerRect = messageList.wrapRef.getBoundingClientRect()
+  const messageRect = lastUserMessage.getBoundingClientRect()
+
+  return messageRect.top >= containerRect.top && messageRect.bottom <= containerRect.bottom
 }
 
-// 判断是否在查看最新消息
-const isNearBottom = () => {
+// 监听滚动事件
+const onScroll = () => {
   const messageList = messageListRef.value
-  if (!messageList) return false
-  
-  // 计算距离底部的距离
-  const { scrollTop, scrollHeight, clientHeight } = messageList
-  // 如果距离底部不超过100px，认为是在查看最新消息
-  return scrollHeight - (scrollTop + clientHeight) <= 100
+  if (!messageList) return
+
+  shouldAutoScroll.value = isNearBottom()
 }
 
 // 监听消息列表变化（包括切换会话）
@@ -297,7 +298,7 @@ watch(() => currentMessages.value, () => {
   nextTick(() => {
     const messageList = messageListRef.value
     if (messageList) {
-      messageList.scrollTop = messageList.scrollHeight
+      messageList.setScrollTop(messageList.wrapRef.scrollHeight)
     }
   })
 }, { immediate: true, deep: true })
@@ -331,7 +332,7 @@ const sendMessage = async () => {
     // 发送消息时一定滚动到底部
     const messageList = messageListRef.value
     if (messageList) {
-      messageList.scrollTop = messageList.scrollHeight
+      messageList.setScrollTop(messageList.wrapRef.scrollHeight)
     }
     
     // 创建助手消息
@@ -417,5 +418,10 @@ marked.setOptions({
   },
   breaks: true,
   gfm: true
+})
+
+// 暴露方法给父组件
+defineExpose({
+  jumpToBottom
 })
 </script>
