@@ -1,7 +1,7 @@
 <template>
   <div class="chat-container">
     <!-- 消息列表区域 -->
-    <div class="message-list" ref="messageListRef">
+    <div class="message-list" :class="{ 'smooth-scroll': shouldAutoScroll }" ref="messageListRef">
       <template v-for="message in currentMessages" :key="message.id">
         <div v-if="message.content && message.content.trim()" class="message" :class="message.role">
           <div class="message-content" v-html="renderMarkdown(message.content || '')"></div>
@@ -73,25 +73,27 @@
   flex-direction: column;
   height: 100%;
   background-color: var(--el-bg-color);
-  overflow: hidden; /* 防止整个容器滚动 */
+  overflow: hidden;
 }
 
 .message-list {
   flex: 1;
-  overflow-y: auto; /* 只允许消息列表滚动 */
-  overflow-x: hidden;
+  overflow-y: auto;
   padding: 20px;
-  scroll-behavior: smooth;
   box-sizing: border-box;
 }
 
+.message-list.smooth-scroll {
+  scroll-behavior: smooth;
+}
+
 .input-container {
-  flex: 0 0 auto; /* 防止输入区域被压缩 */
+  flex: 0 0 auto;
   padding: 20px;
   background-color: var(--el-bg-color);
   border-top: 1px solid var(--el-border-color-lighter);
   box-sizing: border-box;
-  z-index: 1; /* 确保输入区域始终在顶部 */
+  z-index: 1;
 }
 
 .input-wrapper {
@@ -206,7 +208,7 @@
 </style>
 
 <script setup>
-import { ref, watch, nextTick, computed } from 'vue'
+import { ref, watch, nextTick, computed, defineExpose } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '../../stores/chatStore'
 import { useModelStore } from '../../stores/modelStore'
@@ -228,6 +230,38 @@ const messageListRef = ref(null)
 // 当前正在生成的消息
 let responseCleanup = null
 let shouldAutoScroll = ref(true)
+
+// 立即定位到底部（不需要检查条件，不使用平滑滚动）
+const jumpToBottom = () => {
+  const messageList = messageListRef.value
+  if (messageList) {
+    // 临时禁用平滑滚动
+    messageList.style.scrollBehavior = 'auto'
+    messageList.scrollTop = messageList.scrollHeight
+    // 恢复默认行为
+    requestAnimationFrame(() => {
+      messageList.style.scrollBehavior = ''
+    })
+  }
+}
+
+// 智能滚动到底部（带平滑效果）
+const scrollToBottom = async () => {
+  await nextTick()
+  const messageList = messageListRef.value
+  if (!messageList) return
+
+  // 如果在底部或最新用户消息可见，则滚动到底部
+  if (isNearBottom() || isLatestUserMessageVisible()) {
+    shouldAutoScroll.value = true
+    messageList.scrollTop = messageList.scrollHeight
+  }
+}
+
+// 暴露方法给父组件
+defineExpose({
+  jumpToBottom
+})
 
 // 判断最新的用户消息是否可见
 const isLatestUserMessageVisible = () => {
@@ -258,17 +292,23 @@ const isNearBottom = () => {
   return scrollHeight - (scrollTop + clientHeight) <= 100
 }
 
-// 智能滚动到底部
-const scrollToBottom = async () => {
-  await nextTick()
-  const messageList = messageListRef.value
-  if (!messageList) return
+// 监听消息列表变化（包括切换会话）
+watch(() => currentMessages.value, () => {
+  nextTick(() => {
+    const messageList = messageListRef.value
+    if (messageList) {
+      messageList.scrollTop = messageList.scrollHeight
+    }
+  })
+}, { immediate: true, deep: true })
 
-  // 如果在底部或最新用户消息可见，则滚动到底部
-  if (isNearBottom() || isLatestUserMessageVisible()) {
-    messageList.scrollTop = messageList.scrollHeight
+// 监听响应更新
+watch(() => responseCleanup, (newVal) => {
+  if (newVal) {
+    // 新的响应处理器被创建时，记录当前状态
+    shouldAutoScroll.value = isNearBottom() || isLatestUserMessageVisible()
   }
-}
+}, { immediate: true })
 
 // 发送消息
 const sendMessage = async () => {
@@ -302,7 +342,9 @@ const sendMessage = async () => {
       if (chunk) {
         chatStore.updateMessageContent(assistantMessage.id, chunk)
         // 根据之前的状态决定是否滚动
-        scrollToBottom()
+        if (shouldAutoScroll.value) {
+          scrollToBottom()
+        }
       }
       if (done) {
         responseCleanup()

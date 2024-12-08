@@ -49,16 +49,15 @@
                 <div v-for="chat in chatStore.conversations" 
                      :key="chat.id" 
                      class="history-item"
-                     :class="{ active: chatStore.currentConversationId === chat.id }"
+                     :class="{ active: chat.id === chatStore.currentConversationId }"
                      @click="selectConversation(chat.id)">
-                  <span class="chat-title">{{ chat.title }}</span>
+                  <span class="title">{{ chat.title || '新对话' }}</span>
                   <el-button 
                     type="danger" 
                     size="small" 
-                    text 
-                    class="delete-btn"
+                    text
                     @click.stop="confirmDelete(chat)">
-                    删除
+                    <i class="el-icon-delete" />
                   </el-button>
                 </div>
               </el-scrollbar>
@@ -71,9 +70,9 @@
         </el-tabs>
       </el-aside>
 
-      <!-- 主内容区 -->
+      <!-- 主要内容区域 -->
       <el-main class="main-content">
-        <slot></slot>
+        <chat-view ref="chatViewRef" />
       </el-main>
     </el-container>
 
@@ -114,11 +113,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useModelStore } from '../../stores/modelStore'
 import { useChatStore } from '../../stores/chatStore'
 import ModelManager from '../../components/model/ModelManager.vue'
+import ChatView from '../../components/chat/ChatView.vue'
 import { ElMessageBox } from 'element-plus'
 import { Warning } from '@element-plus/icons-vue'
 
@@ -160,8 +160,12 @@ const createNewChat = () => {
 }
 
 // 选择对话
-const selectConversation = (chatId) => {
-  chatStore.selectConversation(chatId)
+const selectConversation = async (chatId) => {
+  await chatStore.selectConversation(chatId)
+  // 切换会话后立即跳转到底部
+  nextTick(() => {
+    chatViewRef.value?.jumpToBottom()
+  })
 }
 
 // 确认删除对话
@@ -178,6 +182,8 @@ const deleteChat = () => {
     chatToDelete.value = null
   }
 }
+
+const chatViewRef = ref(null)
 </script>
 
 <style scoped>
