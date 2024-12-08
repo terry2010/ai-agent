@@ -25,45 +25,50 @@
     </div>
 
     <!-- 输入区域 -->
-    <div class="input-area">
-      <div class="model-selector">
-        <el-select
-          v-model="currentModel"
-          placeholder="选择模型"
-          :loading="modelStore.loading"
+    <div class="input-container">
+      <div class="input-wrapper">
+        <div class="model-selector">
+          <el-select
+            v-model="currentModel"
+            placeholder="选择模型"
+            :loading="modelStore.loading"
+            :disabled="isLoading"
+            style="width: 200px">
+            <el-option
+              v-for="model in modelStore.models"
+              :key="model.name"
+              :label="model.name + ' (' + formatSize(model.size) + ')'"
+              :value="model.name">
+              <span>{{ model.name }}</span>
+              <span class="model-size">{{ formatSize(model.size) }}</span>
+            </el-option>
+          </el-select>
+        </div>
+        <el-input
+          v-model="inputMessage"
+          type="textarea"
+          :rows="3"
+          placeholder="输入消息..."
+          resize="none"
           :disabled="isLoading"
-          style="width: 200px">
-          <el-option
-            v-for="model in modelStore.models"
-            :key="model.name"
-            :label="model.name + ' (' + formatSize(model.size) + ')'"
-            :value="model.name">
-            <span>{{ model.name }}</span>
-            <span class="model-size">{{ formatSize(model.size) }}</span>
-          </el-option>
-        </el-select>
-      </div>
-      <el-input
-        v-model="inputMessage"
-        type="textarea"
-        :rows="3"
-        placeholder="输入消息..."
-        resize="none"
-        :disabled="isLoading"
-        @keydown.enter.exact.prevent="sendMessage"
-        @keydown.shift.enter.exact.prevent="newline"
-      />
-      <div class="button-group">
-        <el-button 
-          type="primary" 
-          @click="sendMessage" 
-          :loading="isLoading"
-          :disabled="!inputMessage.trim() || isLoading || !currentModel">
-          发送
-        </el-button>
-        <el-button @click="clearInput" :disabled="!inputMessage || isLoading">
-          清空
-        </el-button>
+          @keydown.enter.exact.prevent="sendMessage"
+          @keydown.shift.enter.exact.prevent="newline"
+          class="message-input"
+        />
+        <div class="button-group">
+          <el-button 
+            type="primary" 
+            @click="sendMessage" 
+            :loading="isLoading"
+            :disabled="!inputMessage.trim() || isLoading || !currentModel"
+            class="send-button"
+          >
+            发送
+          </el-button>
+          <el-button @click="clearInput" :disabled="!inputMessage || isLoading">
+            清空
+          </el-button>
+        </div>
       </div>
     </div>
 
@@ -103,6 +108,14 @@ let responseCleanup = null
 watch(() => currentMessages.value?.length, () => {
   scrollToBottom()
 }, { deep: true })
+
+// 监听响应更新
+watch(() => responseCleanup, (newVal) => {
+  if (newVal) {
+    // 当有新的响应处理器时，说明正在接收新消息
+    scrollToBottom()
+  }
+}, { immediate: true })
 
 // 配置 marked
 marked.setOptions({
@@ -184,6 +197,7 @@ const sendMessage = async () => {
     // 创建用户消息
     const userMessage = await chatStore.addMessage(inputMessage.value.trim(), 'user')
     clearInput()
+    await scrollToBottom()
     
     // 创建助手消息
     const assistantMessage = await chatStore.addMessage('', 'assistant')
@@ -192,6 +206,7 @@ const sendMessage = async () => {
     responseCleanup = window.api.onResponseChunk(({ chunk, done }) => {
       if (chunk) {
         chatStore.updateMessageContent(assistantMessage.id, chunk)
+        scrollToBottom()
       }
       if (done) {
         responseCleanup()
@@ -268,15 +283,45 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 20px;
-  background: #f7f8fa;
+  background-color: var(--el-bg-color);
+  overflow: hidden; /* 防止整个容器滚动 */
 }
 
 .message-list {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto; /* 只允许消息列表滚动 */
+  overflow-x: hidden;
   padding: 20px;
-  margin-bottom: 20px;
+  scroll-behavior: smooth;
+  box-sizing: border-box;
+}
+
+.input-container {
+  flex: 0 0 auto; /* 防止输入区域被压缩 */
+  padding: 20px;
+  background-color: var(--el-bg-color);
+  border-top: 1px solid var(--el-border-color-lighter);
+  box-sizing: border-box;
+  z-index: 1; /* 确保输入区域始终在顶部 */
+}
+
+.input-wrapper {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.message-input {
+  flex: 1;
+  min-height: 40px;
+  max-height: 200px;
+  resize: vertical;
+}
+
+.send-button {
+  height: 40px;
 }
 
 .message {
@@ -348,35 +393,6 @@ onMounted(async () => {
 
 .message:hover .message-actions {
   opacity: 1;
-}
-
-.input-area {
-  margin-top: auto;
-  padding: 20px;
-  background: white;
-  border-top: 1px solid #e8e8e8;
-  border-radius: 8px;
-}
-
-.model-selector {
-  margin-bottom: 12px;
-}
-
-:deep(.markdown-body) {
-  background-color: transparent !important;
-  margin: 0;
-  padding: 0;
-}
-
-:deep(.markdown-body pre) {
-  background-color: #282c34;
-  margin: 8px 0;
-  border-radius: 6px;
-}
-
-:deep(.el-textarea__inner) {
-  resize: none !important;
-  border-radius: 8px;
 }
 
 .error-alert {

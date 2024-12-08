@@ -180,21 +180,33 @@ const deleteChat = () => {
 <style scoped>
 .layout-container {
   height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .header {
-  border-bottom: 1px solid var(--el-border-color-light);
+  flex: 0 0 48px;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  align-items: center;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background-color: var(--el-bg-color);
+}
+
+.main-container {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
 }
 
 .sidebar {
-  border-right: 1px solid var(--el-border-color-light);
-  background-color: var(--el-bg-color-page);
+  flex: 0 0 240px;
   display: flex;
   flex-direction: column;
+  border-right: 1px solid var(--el-border-color-lighter);
+  background-color: var(--el-bg-color-page);
+  overflow: hidden;
 }
 
 :deep(.el-tabs) {
