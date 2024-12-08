@@ -9,7 +9,7 @@ let store;
     store = new Store({
       defaults: {
         settings: {
-          defaultModel: 'codellama',
+          defaultModel: 'qwen',  // 修改默认模型为 qwen
           modelEndpoint: 'http://localhost:11434',
           timeout: 30,
           theme: 'light',
@@ -53,11 +53,19 @@ function setupIPC(mainWindow) {
   })
 
   // 发送消息
-  ipcMain.handle('send-message', async (event, { content }) => {
+  ipcMain.handle('send-message', async (event, { content, model }) => {
     try {
-      logger.debug('Sending message:', content)
-      const settings = store.get('settings')
-      const response = await ollamaService.generateResponse(content, settings.defaultModel)
+      // 如果没有指定模型，获取可用模型列表并使用第一个
+      if (!model) {
+        const modelInfo = await ollamaService.listModels()
+        if (!modelInfo?.models?.length) {
+          throw new Error('没有可用的模型')
+        }
+        model = modelInfo.models[0].name
+      }
+      
+      logger.debug('Sending message:', { content: content.substring(0, 100), model })
+      const response = await ollamaService.generateResponse(content, model)
       logger.debug('Message response received')
       return { content: response }
     } catch (error) {

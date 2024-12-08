@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useModelStore } from './modelStore' // Import modelStore
 
 export const useChatStore = defineStore('chat', {
   state: () => ({
@@ -92,7 +93,11 @@ export const useChatStore = defineStore('chat', {
           this.isLoading = true
           this.error = null
 
-          const response = await window.api.sendMessage(content)
+          // 从 modelStore 获取当前选择的模型
+          const modelStore = useModelStore()
+          const currentModel = modelStore.currentModel || null
+
+          const response = await window.api.sendMessage(content, currentModel)
           await this.addMessage(response.content, 'assistant')
         } catch (err) {
           this.error = err.message

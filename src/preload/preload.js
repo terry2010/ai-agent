@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   
   // AI 响应生成
   generateResponse: (params) => ipcRenderer.invoke('generate-response', params),
-  sendMessage: (content) => ipcRenderer.invoke('send-message', { content }),
+  sendMessage: (content, model) => ipcRenderer.invoke('send-message', { content, model }),
   
   // 设置管理
   getSettings: () => ipcRenderer.invoke('get-settings'),
