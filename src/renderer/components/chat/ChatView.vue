@@ -97,14 +97,10 @@ const { currentMessages, isLoading, error: chatError } = storeToRefs(chatStore)
 const { currentModel, error: modelError, isConnected } = storeToRefs(modelStore)
 
 // 当前正在生成的消息
-const currentGeneratingMessage = ref(null)
+let responseCleanup = null
 
 // 监听消息内容变化，自动滚动到底部
 watch(() => currentMessages.value?.length, () => {
-  scrollToBottom()
-}, { deep: true })
-
-watch(() => currentGeneratingMessage.value?.content, () => {
   scrollToBottom()
 }, { deep: true })
 
@@ -172,28 +168,42 @@ const resendMessage = async (message) => {
 
 // 发送消息
 const sendMessage = async () => {
-  if (!inputMessage.value.trim()) return
+  if (!inputMessage.value.trim() || isLoading.value) return
   
   try {
-    if (!isConnected.value) {
-      throw new Error('Ollama 服务未连接')
-    }
-    
     if (!currentModel.value) {
       throw new Error('请先选择一个模型')
     }
-    
+
+    // 清理之前的响应处理器
+    if (responseCleanup) {
+      responseCleanup()
+      responseCleanup = null
+    }
+
     // 创建用户消息
-    await chatStore.addMessage(inputMessage.value, 'user')
-    inputMessage.value = ''
+    const userMessage = await chatStore.addMessage(inputMessage.value.trim(), 'user')
+    clearInput()
     
     // 创建助手消息
     const assistantMessage = await chatStore.addMessage('', 'assistant')
-    currentGeneratingMessage.value = assistantMessage
     
-    await scrollToBottom()
-  } catch (err) {
-    ElMessage.error(err.message)
+    // 设置响应处理器
+    responseCleanup = window.api.onResponseChunk(({ chunk, done }) => {
+      if (chunk) {
+        chatStore.updateMessageContent(assistantMessage.id, chunk)
+      }
+      if (done) {
+        responseCleanup()
+        responseCleanup = null
+      }
+    })
+
+    // 发送消息到模型
+    await window.api.sendMessage(userMessage.content, currentModel.value)
+  } catch (error) {
+    console.error('Failed to send message:', error)
+    ElMessage.error(error.message)
   }
 }
 
@@ -230,6 +240,14 @@ watch([chatError, modelError], ([newChatError, newModelError]) => {
   }
 })
 
+// 在组件卸载时清理
+onUnmounted(() => {
+  if (responseCleanup) {
+    responseCleanup()
+    responseCleanup = null
+  }
+})
+
 // 在组件挂载时初始化
 onMounted(async () => {
   console.log('ChatView mounted')
@@ -238,35 +256,11 @@ onMounted(async () => {
     console.log('Fetching models...')
     await modelStore.fetchModels()
     console.log('Models fetched:', modelStore.models)
-    
-    // 设置响应流事件监听
-    const cleanup = window.api.onResponseChunk(({ chunk, done }) => {
-      console.log('Response chunk received:', { chunk, done })
-      if (currentGeneratingMessage.value) {
-        currentGeneratingMessage.value.content += chunk
-        if (done) {
-          currentGeneratingMessage.value = null
-          chatStore.saveToLocalStorage() // 保存完整的对话
-        }
-      }
-    })
-    
-    // 组件卸载时清理事件监听器
-    onUnmounted(() => {
-      cleanup()
-    })
   } catch (err) {
     console.error('Failed to initialize chat view:', err)
     ElMessage.error(err.message)
   }
 })
-
-// 监听消息变化，自动滚动到底部
-watch(currentMessages, () => {
-  nextTick(() => {
-    scrollToBottom()
-  })
-}, { deep: true })
 </script>
 
 <style scoped>

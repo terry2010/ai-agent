@@ -78,31 +78,6 @@ export const useChatStore = defineStore('chat', {
           if (!modelStore.currentModel) {
             throw new Error('请先选择一个模型')
           }
-
-          log.info('Sending message to model:', modelStore.currentModel)
-          
-          // 创建助手的回复消息占位
-          const assistantMessage = await this.addMessage('', 'assistant')
-          
-          // 设置流式响应处理
-          window.api.onResponseChunk(({ chunk, done }) => {
-            if (chunk) {
-              // 更新助手消息的内容
-              const updatedMessage = conversation.messages.find(m => m.id === assistantMessage.id)
-              if (updatedMessage) {
-                updatedMessage.content += chunk
-                this.saveToLocalStorage()
-              }
-            }
-            
-            if (done) {
-              this.isLoading = false
-            }
-          })
-          
-          // 发送消息给模型
-          await window.api.sendMessage(content, modelStore.currentModel)
-          
         } catch (err) {
           log.error('Failed to get model response:', err)
           this.error = err.message
@@ -113,6 +88,23 @@ export const useChatStore = defineStore('chat', {
       }
 
       return message
+    },
+
+    // 更新消息内容
+    updateMessageContent(messageId, chunk) {
+      const conversation = this.conversations.find(conv => conv.id === this.currentConversationId)
+      if (!conversation) return
+
+      const message = conversation.messages.find(m => m.id === messageId)
+      if (message) {
+        // 使用新的消息对象来触发响应式更新
+        const index = conversation.messages.indexOf(message)
+        conversation.messages[index] = {
+          ...message,
+          content: (message.content || '') + chunk
+        }
+        this.saveToLocalStorage()
+      }
     },
 
     async checkModelStatus() {
@@ -201,7 +193,8 @@ if (process.env.NODE_ENV === 'development') {
     'saveToLocalStorage',
     'reset',
     'deleteConversation',
-    'selectConversation'
+    'selectConversation',
+    'updateMessageContent'
   ]
   console.log('Store defined with actions:', storeActions)
 }
