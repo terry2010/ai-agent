@@ -89,19 +89,24 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useModelStore } from '../../stores/modelStore'
+import { storeToRefs } from 'pinia'
+import { useModelStore } from '@/stores/modelStore'
 import { ElMessage } from 'element-plus'
 
+// 初始化 store
 const modelStore = useModelStore()
-const showError = ref(false)
 
-const {
+// 使用 storeToRefs 来保持响应性
+const { 
   currentModel,
   availableModels,
   error,
   isLoading,
-  isConnected
+  isConnected 
 } = storeToRefs(modelStore)
+
+// 错误弹窗控制
+const showError = ref(false)
 
 // 获取状态类型
 const getStatusType = (status) => {

@@ -122,9 +122,21 @@ export const useModelStore = defineStore('model', () => {
       
       if (response.connected) {
         setStatus('connected')
-        await fetchModels()
+        // 更新模型列表
+        if (response.models) {
+          availableModels.value = response.models.map(model => ({
+            id: model.name,
+            name: model.name,
+            description: model.details || '无描述',
+            status: modelStatuses.value[model.name] || { available: true }
+          }))
+        }
+        // 如果没有选择模型，自动选择第一个可用的模型
+        if (!currentModel.value && availableModels.value.length > 0) {
+          await setCurrentModel(availableModels.value[0].id)
+        }
       } else {
-        setError('无法连接到 Ollama 服务', ErrorTypes.CONNECTION)
+        setError(response.error || '无法连接到 Ollama 服务', ErrorTypes.CONNECTION)
       }
     } catch (err) {
       setError(err.message, ErrorTypes.CONNECTION)
@@ -132,6 +144,10 @@ export const useModelStore = defineStore('model', () => {
   }
 
   const retryConnection = async () => {
+    if (retryCount.value >= maxRetries) {
+      setError('已达到最大重试次数，请检查 Ollama 服务是否正在运行', ErrorTypes.CONNECTION)
+      return
+    }
     await checkConnection()
   }
 

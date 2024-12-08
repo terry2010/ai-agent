@@ -15,52 +15,60 @@
     <el-container class="main-container">
       <!-- 左侧边栏 -->
       <el-aside width="240px" class="sidebar">
-        <el-select 
-          v-model="modelStore.currentModel" 
-          placeholder="选择模型" 
-          class="model-select"
-          :loading="modelStore.isLoading"
-          @change="handleModelChange">
-          <el-option 
-            v-for="model in modelStore.availableModels" 
-            :key="model.id" 
-            :label="model.name" 
-            :value="model.id">
-            <span>{{ model.name }}</span>
-            <small style="color: var(--el-text-color-secondary)">{{ model.description }}</small>
-          </el-option>
-        </el-select>
-        
-        <div class="history-list">
-          <div class="history-header">
-            <span class="history-title">历史记录</span>
-            <el-button 
-              type="primary" 
-              size="small" 
-              text 
-              @click="createNewChat">
-              新对话
-            </el-button>
-          </div>
-          
-          <el-scrollbar>
-            <div v-for="chat in chatStore.conversations" 
-                 :key="chat.id" 
-                 class="history-item"
-                 :class="{ active: chatStore.currentConversationId === chat.id }"
-                 @click="selectChat(chat.id)">
-              <span class="chat-title">{{ chat.title }}</span>
-              <el-button 
-                type="danger" 
-                size="small" 
-                text 
-                class="delete-btn"
-                @click.stop="confirmDelete(chat)">
-                删除
-              </el-button>
+        <el-tabs v-model="activeTab">
+          <el-tab-pane label="聊天" name="chat">
+            <el-select 
+              v-model="modelStore.currentModel" 
+              placeholder="选择模型" 
+              class="model-select"
+              :loading="modelStore.isLoading"
+              @change="handleModelChange">
+              <el-option 
+                v-for="model in modelStore.availableModels" 
+                :key="model.id" 
+                :label="model.name" 
+                :value="model.id">
+                <span>{{ model.name }}</span>
+                <small style="color: var(--el-text-color-secondary)">{{ model.description }}</small>
+              </el-option>
+            </el-select>
+            
+            <div class="history-list">
+              <div class="history-header">
+                <span class="history-title">历史记录</span>
+                <el-button 
+                  type="primary" 
+                  size="small" 
+                  text 
+                  @click="createNewChat">
+                  新对话
+                </el-button>
+              </div>
+              
+              <el-scrollbar>
+                <div v-for="chat in chatStore.conversations" 
+                     :key="chat.id" 
+                     class="history-item"
+                     :class="{ active: chatStore.currentConversationId === chat.id }"
+                     @click="selectChat(chat.id)">
+                  <span class="chat-title">{{ chat.title }}</span>
+                  <el-button 
+                    type="danger" 
+                    size="small" 
+                    text 
+                    class="delete-btn"
+                    @click.stop="confirmDelete(chat)">
+                    删除
+                  </el-button>
+                </div>
+              </el-scrollbar>
             </div>
-          </el-scrollbar>
-        </div>
+          </el-tab-pane>
+          
+          <el-tab-pane label="模型" name="model">
+            <ModelManager />
+          </el-tab-pane>
+        </el-tabs>
       </el-aside>
 
       <!-- 主内容区 -->
@@ -98,8 +106,9 @@
 <script setup>
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useModelStore } from '../../stores/modelStore'
-import { useChatStore } from '../../stores/chatStore'
+import { useModelStore } from '@/stores/modelStore'
+import { useChatStore } from '@/stores/chatStore'
+import ModelManager from '@/components/model/ModelManager.vue'
 import { ElMessageBox } from 'element-plus'
 
 // 初始化 stores
@@ -109,6 +118,9 @@ const chatStore = useChatStore()
 // 删除对话相关
 const showDeleteConfirm = ref(false)
 const chatToDelete = ref(null)
+
+// 标签页相关
+const activeTab = ref('chat')
 
 // 处理模型切换
 const handleModelChange = async (modelId) => {
@@ -154,22 +166,34 @@ const deleteChat = () => {
 }
 
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   border-bottom: 1px solid var(--el-border-color-light);
-  background-color: var(--el-bg-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 0 16px;
-}
-
-.main-container {
-  height: calc(100vh - 48px);
 }
 
 .sidebar {
   border-right: 1px solid var(--el-border-color-light);
   background-color: var(--el-bg-color-page);
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.el-tabs) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.el-tabs__content) {
+  flex: 1;
+  overflow: hidden;
   padding: 16px;
+}
+
+:deep(.el-tab-pane) {
+  height: 100%;
 }
 
 .model-select {

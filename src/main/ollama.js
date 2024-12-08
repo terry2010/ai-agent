@@ -5,10 +5,11 @@ const logger = require('./logger')
 class OllamaService extends EventEmitter {
   constructor() {
     super()
-    this.baseURL = 'http://localhost:11434'
+    this.baseURL = 'http://127.0.0.1:11434'  // 使用 127.0.0.1 替代 localhost
     this.client = axios.create({
       baseURL: this.baseURL,
-      timeout: 30000
+      timeout: 3000,
+      proxy: false  // 禁用代理
     })
     this.setupInterceptors()
     this.requestQueue = []
@@ -89,10 +90,18 @@ class OllamaService extends EventEmitter {
 
   async executeRequest(request) {
     try {
-      return await request()
+      const result = await request()
+      return result
     } catch (error) {
+      logger.error('Request execution failed:', error)
       if (error.code === 'ECONNREFUSED') {
-        throw new Error('Ollama service is not running')
+        // 尝试使用备用地址
+        if (this.client.defaults.baseURL.includes('localhost')) {
+          logger.info('Switching to 127.0.0.1...')
+          this.client.defaults.baseURL = this.client.defaults.baseURL.replace('localhost', '127.0.0.1')
+          return await request()
+        }
+        throw new Error('Ollama 服务未运行或无法访问 (端口 11434)')
       }
       throw error
     }
@@ -101,8 +110,23 @@ class OllamaService extends EventEmitter {
   // 模型管理 API
   async listModels() {
     return this.enqueueRequest(async () => {
-      const response = await this.client.get('/api/tags')
-      return response.data.models
+      try {
+        logger.info('Fetching model list from Ollama')
+        const response = await this.client.get('/api/tags')
+        logger.info(`Successfully fetched ${response.data.models?.length || 0} models`)
+        
+        if (!response.data || !response.data.models) {
+          throw new Error('Invalid response format from Ollama API')
+        }
+        
+        return response.data.models
+      } catch (error) {
+        logger.error('Failed to fetch models:', error)
+        if (error.code === 'ECONNREFUSED') {
+          throw new Error('无法连接到 Ollama 服务，请确保服务正在运行')
+        }
+        throw new Error(`获取模型列表失败: ${error.message}`)
+      }
     })
   }
 
@@ -143,11 +167,30 @@ class OllamaService extends EventEmitter {
   // 模型状态检测
   async checkStatus() {
     try {
-      const models = await this.listModels()
-      return { connected: true, models }
+      logger.info('Checking Ollama service status...')
+      // 使用一个简单的 API 调用来检查服务状态
+      const response = await this.client.get('/api/tags')
+      
+      if (!response.data || !response.data.models) {
+        throw new Error('Invalid response from Ollama service')
+      }
+      
+      logger.info(`Ollama service is running, found ${response.data.models.length} models`)
+      return { 
+        connected: true, 
+        models: response.data.models,
+        timestamp: new Date().toISOString()
+      }
     } catch (error) {
       logger.error('Ollama service check failed:', error)
-      return { connected: false, error: error.message }
+      const message = error.code === 'ECONNREFUSED' 
+        ? '无法连接到 Ollama 服务，请确保服务正在运行'
+        : `连接 Ollama 服务失败: ${error.message}`
+      return { 
+        connected: false, 
+        error: message,
+        timestamp: new Date().toISOString()
+      }
     }
   }
 

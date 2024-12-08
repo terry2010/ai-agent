@@ -65,11 +65,17 @@ function setupIPC(mainWindow) {
   // 获取可用模型列表
   ipcMain.handle('list-models', async () => {
     try {
+      logger.info('Handling list-models request')
       const models = await ollamaService.listModels()
-      return { models }
+      logger.info(`Successfully retrieved ${models.length} models`)
+      return { models, success: true }
     } catch (error) {
       logger.error('List models failed:', error)
-      throw error
+      return { 
+        models: [], 
+        success: false, 
+        error: error.message || '获取模型列表失败'
+      }
     }
   })
 
