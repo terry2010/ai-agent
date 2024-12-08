@@ -21,15 +21,15 @@
               v-model="modelStore.currentModel" 
               placeholder="选择模型" 
               class="model-select"
-              :loading="modelStore.isLoading"
+              :loading="modelStore.loading"
               @change="handleModelChange">
               <el-option 
-                v-for="model in modelStore.availableModels" 
-                :key="model.id" 
+                v-for="model in modelStore.models" 
+                :key="model.name" 
                 :label="model.name" 
-                :value="model.id">
+                :value="model.name">
                 <span>{{ model.name }}</span>
-                <small style="color: var(--el-text-color-secondary)">{{ model.description }}</small>
+                <span class="model-size">{{ formatSize(model.size) }}</span>
               </el-option>
             </el-select>
             
@@ -116,9 +116,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useModelStore } from '@/stores/modelStore'
-import { useChatStore } from '@/stores/chatStore'
-import ModelManager from '@/components/model/ModelManager.vue'
+import { useModelStore } from '../../stores/modelStore'
+import { useChatStore } from '../../stores/chatStore'
+import ModelManager from '../../components/model/ModelManager.vue'
 import { ElMessageBox } from 'element-plus'
 import { Warning } from '@element-plus/icons-vue'
 
@@ -133,23 +133,26 @@ const chatToDelete = ref(null)
 // 标签页相关
 const activeTab = ref('chat')
 
-// 组件挂载时初始化
-onMounted(async () => {
-  console.log('=== MainLayout: Component mounted ===')
-  await modelStore.fetchModels()
-})
+// 格式化文件大小
+const formatSize = (bytes) => {
+  if (!bytes) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
+}
 
 // 处理模型切换
-const handleModelChange = async (modelId) => {
-  try {
-    await modelStore.setCurrentModel(modelId)
-  } catch (error) {
-    ElMessageBox.alert(error.message, '切换模型失败', {
-      type: 'error',
-      confirmButtonText: '确定'
-    })
+const handleModelChange = async (modelName) => {
+  if (modelName) {
+    await modelStore.setCurrentModel(modelName)
   }
 }
+
+// 初始化
+onMounted(async () => {
+  await modelStore.fetchModels()
+})
 
 // 创建新对话
 const createNewChat = () => {
