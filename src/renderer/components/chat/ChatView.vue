@@ -104,18 +104,68 @@ const { currentModel, error: modelError, isConnected } = storeToRefs(modelStore)
 // 当前正在生成的消息
 let responseCleanup = null
 
-// 监听消息内容变化，自动滚动到底部
+// 判断最新的用户消息是否可见
+const isLatestUserMessageVisible = () => {
+  const messageList = messageListRef.value
+  if (!messageList) return false
+
+  // 找到最新的用户消息元素
+  const userMessages = messageList.querySelectorAll('.message.user')
+  if (userMessages.length === 0) return false
+  const latestUserMessage = userMessages[userMessages.length - 1]
+
+  // 获取消息列表的可视区域
+  const listRect = messageList.getBoundingClientRect()
+  const messageRect = latestUserMessage.getBoundingClientRect()
+
+  // 检查消息是否在可视区域内
+  return messageRect.top >= listRect.top && messageRect.bottom <= listRect.bottom
+}
+
+// 判断是否在查看最新消息
+const isNearBottom = () => {
+  const messageList = messageListRef.value
+  if (!messageList) return false
+  
+  // 计算距离底部的距离
+  const { scrollTop, scrollHeight, clientHeight } = messageList
+  // 如果距离底部不超过100px，认为是在查看最新消息
+  return scrollHeight - (scrollTop + clientHeight) <= 100
+}
+
+// 智能滚动到底部
+const scrollToBottom = async () => {
+  await nextTick()
+  const messageList = messageListRef.value
+  if (!messageList) return
+
+  // 如果在底部或最新用户消息可见，则滚动到底部
+  if (isNearBottom() || isLatestUserMessageVisible()) {
+    messageList.scrollTop = messageList.scrollHeight
+  }
+}
+
+// 监听消息变化
 watch(() => currentMessages.value?.length, () => {
-  scrollToBottom()
-}, { deep: true })
+  // 新消息时一定滚动到底部
+  const messageList = messageListRef.value
+  if (messageList) {
+    messageList.scrollTop = messageList.scrollHeight
+  }
+})
 
 // 监听响应更新
 watch(() => responseCleanup, (newVal) => {
   if (newVal) {
-    // 当有新的响应处理器时，说明正在接收新消息
-    scrollToBottom()
+    // 新的响应处理器被创建时，记录当前状态
+    shouldAutoScroll = isNearBottom() || isLatestUserMessageVisible()
   }
 }, { immediate: true })
+
+// 监听消息内容变化，自动滚动到底部
+watch(() => currentMessages.value?.length, () => {
+  scrollToBottom()
+}, { deep: true })
 
 // 配置 marked
 marked.setOptions({
@@ -197,7 +247,11 @@ const sendMessage = async () => {
     // 创建用户消息
     const userMessage = await chatStore.addMessage(inputMessage.value.trim(), 'user')
     clearInput()
-    await scrollToBottom()
+    // 发送消息时一定滚动到底部
+    const messageList = messageListRef.value
+    if (messageList) {
+      messageList.scrollTop = messageList.scrollHeight
+    }
     
     // 创建助手消息
     const assistantMessage = await chatStore.addMessage('', 'assistant')
@@ -206,6 +260,7 @@ const sendMessage = async () => {
     responseCleanup = window.api.onResponseChunk(({ chunk, done }) => {
       if (chunk) {
         chatStore.updateMessageContent(assistantMessage.id, chunk)
+        // 根据之前的状态决定是否滚动
         scrollToBottom()
       }
       if (done) {
@@ -233,13 +288,7 @@ const newline = () => {
 }
 
 // 滚动到底部
-const scrollToBottom = async () => {
-  await nextTick()
-  const messageList = messageListRef.value
-  if (messageList) {
-    messageList.scrollTop = messageList.scrollHeight
-  }
-}
+const shouldAutoScroll = ref(false)
 
 // 输入消息
 const inputMessage = ref('')
