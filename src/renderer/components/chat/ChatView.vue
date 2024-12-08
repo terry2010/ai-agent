@@ -275,6 +275,7 @@ watch(currentMessages, () => {
   flex-direction: column;
   height: 100%;
   padding: 20px;
+  background: #f7f8fa;
 }
 
 .message-list {
@@ -285,10 +286,11 @@ watch(currentMessages, () => {
 }
 
 .message {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
   display: flex;
   flex-direction: column;
   width: 100%;
+  position: relative;
 }
 
 .message.user {
@@ -306,6 +308,8 @@ watch(currentMessages, () => {
   background-color: #f0f2f5;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  position: relative;
+  margin-bottom: 4px;
 }
 
 .message.user .message-content {
@@ -319,21 +323,26 @@ watch(currentMessages, () => {
 }
 
 .message-footer {
-  margin-top: 4px;
+  font-size: 12px;
+  color: #8c8c8c;
   display: flex;
   gap: 8px;
   align-items: center;
-  font-size: 12px;
-  color: #8c8c8c;
-  padding: 0 8px;
+  padding: 0 4px;
+}
+
+.message.user .message-footer {
+  justify-content: flex-end;
+}
+
+.message.assistant .message-footer {
+  justify-content: flex-start;
 }
 
 .message-time {
   color: #8c8c8c;
-}
-
-.message.user .message-time {
-  color: #8c8c8c;
+  font-size: 12px;
+  line-height: 1;
 }
 
 .message-actions {
@@ -352,6 +361,7 @@ watch(currentMessages, () => {
   padding: 20px;
   background: white;
   border-top: 1px solid #e8e8e8;
+  border-radius: 8px;
 }
 
 .model-selector {
@@ -367,6 +377,7 @@ watch(currentMessages, () => {
 :deep(.markdown-body pre) {
   background-color: #282c34;
   margin: 8px 0;
+  border-radius: 6px;
 }
 
 :deep(.el-textarea__inner) {

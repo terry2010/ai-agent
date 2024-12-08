@@ -81,13 +81,23 @@
     <el-dialog
       v-model="showDeleteConfirm"
       title="确认删除"
-      width="30%">
-      <span>确定要删除对话 "{{ chatToDelete?.title }}" 吗？此操作不可恢复。</span>
+      width="360px"
+      class="delete-dialog"
+      :modal-class="'delete-dialog-modal'"
+      :close-on-click-modal="false"
+      align-center>
+      <div class="delete-dialog-content">
+        <el-icon class="warning-icon"><Warning /></el-icon>
+        <span>确定要删除对话 "{{ chatToDelete?.title }}" 吗？</span>
+        <div class="delete-warning">此操作不可恢复</div>
+      </div>
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="showDeleteConfirm = false">取消</el-button>
-          <el-button type="danger" @click="deleteChat">确定</el-button>
-        </span>
+        <div class="dialog-footer">
+          <el-button plain @click="showDeleteConfirm = false">取消</el-button>
+          <el-button type="danger" @click="deleteChat">
+            确定删除
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -110,6 +120,7 @@ import { useModelStore } from '@/stores/modelStore'
 import { useChatStore } from '@/stores/chatStore'
 import ModelManager from '@/components/model/ModelManager.vue'
 import { ElMessageBox } from 'element-plus'
+import { Warning } from '@element-plus/icons-vue'
 
 // 初始化 stores
 const modelStore = useModelStore()
@@ -284,5 +295,77 @@ const deleteChat = () => {
 :deep(.el-select-dropdown__item small) {
   font-size: 12px;
   margin-top: 2px;
+}
+
+/* 删除确认对话框样式 */
+:deep(.delete-dialog) {
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+:deep(.delete-dialog .el-dialog__header) {
+  margin: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background: white;
+}
+
+:deep(.delete-dialog .el-dialog__body) {
+  background: white;
+  padding: 0;
+}
+
+:deep(.delete-dialog .el-dialog__headerbtn) {
+  top: 16px;
+}
+
+.delete-dialog-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 20px;
+  text-align: center;
+  background: white;
+}
+
+.warning-icon {
+  font-size: 24px;
+  color: var(--el-color-danger);
+  margin-bottom: 16px;
+}
+
+.delete-warning {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+:deep(.delete-dialog .el-dialog__footer) {
+  padding: 16px 20px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  margin: 0;
+  background: white;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+:deep(.delete-dialog-modal) {
+  background-color: rgba(0, 0, 0, 0.65);
+}
+
+:deep(.dialog-footer .el-button--plain) {
+  border-color: var(--el-border-color-lighter);
+  color: var(--el-text-color-regular);
+}
+
+:deep(.dialog-footer .el-button--danger) {
+  border: none;
+  padding: 8px 16px;
 }
 </style>
