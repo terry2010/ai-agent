@@ -80,16 +80,29 @@ export const useChatStore = defineStore('chat', {
           }
 
           log.info('Sending message to model:', modelStore.currentModel)
-          // 发送消息给模型
-          const response = await window.api.sendMessage(content, modelStore.currentModel)
-          log.response('Model response:', response)
           
-          // 添加助手的回复消息
-          if (response && response.response && response.response.trim()) {
-            await this.addMessage(response.response, 'assistant')
-          } else {
-            log.error('Empty response from model:', response)
-          }
+          // 创建助手的回复消息占位
+          const assistantMessage = await this.addMessage('', 'assistant')
+          
+          // 设置流式响应处理
+          window.api.onResponseChunk(({ chunk, done }) => {
+            if (chunk) {
+              // 更新助手消息的内容
+              const updatedMessage = conversation.messages.find(m => m.id === assistantMessage.id)
+              if (updatedMessage) {
+                updatedMessage.content += chunk
+                this.saveToLocalStorage()
+              }
+            }
+            
+            if (done) {
+              this.isLoading = false
+            }
+          })
+          
+          // 发送消息给模型
+          await window.api.sendMessage(content, modelStore.currentModel)
+          
         } catch (err) {
           log.error('Failed to get model response:', err)
           this.error = err.message
