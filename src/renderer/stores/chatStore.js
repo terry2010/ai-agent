@@ -2,6 +2,14 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useModelStore } from './modelStore'
 
+// 添加日志工具
+const DEBUG = process.env.NODE_ENV === 'development'
+const log = {
+  info: (...args) => DEBUG && console.log('[Chat]', ...args),
+  error: (...args) => console.error('[Chat Error]', ...args),
+  response: (...args) => console.log('[AI Response]', ...args)
+}
+
 export const useChatStore = defineStore('chat', {
   state: () => ({
     conversations: [],
@@ -49,6 +57,8 @@ export const useChatStore = defineStore('chat', {
         timestamp: new Date().toISOString()
       }
 
+      log.info(`Adding ${role} message:`, content.substring(0, 100) + '...')
+
       const conversation = this.conversations.find(conv => conv.id === this.currentConversationId)
       if (!conversation) {
         throw new Error('当前会话不存在')
@@ -69,9 +79,17 @@ export const useChatStore = defineStore('chat', {
             throw new Error('请先选择一个模型')
           }
 
+          log.info('Sending message to model:', modelStore.currentModel)
           // 发送消息给模型
-          await window.api.sendMessage(content, modelStore.currentModel)
+          const response = await window.api.sendMessage(content, modelStore.currentModel)
+          log.response('Model response:', response)
+          
+          // 添加助手的回复消息
+          if (response && response.response) {
+            await this.addMessage(response.response, 'assistant')
+          }
         } catch (err) {
+          log.error('Failed to get model response:', err)
           this.error = err.message
           throw err
         } finally {
