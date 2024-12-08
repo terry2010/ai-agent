@@ -10,7 +10,21 @@
                :class="message.role">
             <div class="message-content">
               <div class="message-text" v-html="renderMarkdown(message.content)"></div>
-              <div class="message-time">{{ formatTime(message.timestamp) }}</div>
+              <div class="message-footer">
+                <div class="message-time">{{ formatTime(message.timestamp) }}</div>
+                <div class="message-actions">
+                  <el-tooltip content="复制消息" placement="top" :hide-after="1000">
+                    <el-button type="text" @click="copyMessage(message)">
+                      <i class="el-icon-document-copy" />
+                    </el-button>
+                  </el-tooltip>
+                  <el-tooltip v-if="message.role === 'user'" content="重新发送" placement="top" :hide-after="1000">
+                    <el-button type="text" @click="resendMessage(message)">
+                      <i class="el-icon-refresh" />
+                    </el-button>
+                  </el-tooltip>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -63,6 +77,7 @@ import { useModelStore } from '@/stores/modelStore'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
+import { ElMessage } from 'element-plus'
 
 // 初始化stores
 const chatStore = useChatStore()
@@ -75,18 +90,16 @@ console.log('ChatView setup - store methods:', Object.keys(chatStore))
 const { conversations, currentMessages, isLoading, error } = storeToRefs(chatStore)
 const { currentConversation } = storeToRefs(chatStore)
 
-// 初始化 markdown-it
+// Markdown渲染配置
 const md = new MarkdownIt({
-  html: true,
-  linkify: true,
-  typographer: true,
   highlight: function (str, lang) {
     if (lang && hljs.getLanguage(lang)) {
       try {
-        return hljs.highlight(str, { language: lang }).value
+        const highlighted = hljs.highlight(str, { language: lang, ignoreIllegals: true }).value
+        return `<pre><code class="hljs language-${lang}">${highlighted}</code><button class="copy-button el-button el-button--text" onclick="navigator.clipboard.writeText(\`${str.replace(/`/g, '\\`')}\`).then(() => { const el = document.createElement('span'); el.textContent = '已复制'; el.style.position = 'absolute'; el.style.right = '8px'; el.style.top = '8px'; this.replaceWith(el); setTimeout(() => el.remove(), 1000); })"><i class="el-icon-document-copy"></i></button></pre>`
       } catch (__) {}
     }
-    return '' // 使用默认的转义
+    return '<pre><code class="hljs">' + md.utils.escapeHtml(str) + '</code></pre>'
   }
 })
 
@@ -144,6 +157,21 @@ const formatTime = (timestamp) => {
   return date.toLocaleTimeString()
 }
 
+// 复制消息内容
+const copyMessage = (message) => {
+  navigator.clipboard.writeText(message.content).then(() => {
+    ElMessage.success('消息已复制到剪贴板')
+  }).catch(() => {
+    ElMessage.error('复制失败')
+  })
+}
+
+// 重新发送消息
+const resendMessage = async (message) => {
+  inputMessage.value = message.content
+  await sendMessage()
+}
+
 // 组件挂载后初始化
 onMounted(async () => {
   try {
@@ -164,12 +192,11 @@ watch(currentMessages, () => {
 }, { deep: true })
 </script>
 
-<style>
+<style scoped>
 .chat-container {
   height: 100%;
   display: flex;
   flex-direction: column;
-  position: relative;
 }
 
 .message-list {
@@ -179,37 +206,33 @@ watch(currentMessages, () => {
 }
 
 .message-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .message {
+  margin-bottom: 20px;
   display: flex;
-  margin-bottom: 8px;
+  flex-direction: column;
 }
 
 .message.assistant {
-  justify-content: flex-start;
+  align-items: flex-start;
 }
 
 .message.user {
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 
 .message-content {
   max-width: 80%;
   padding: 12px 16px;
   border-radius: 8px;
-  background-color: var(--el-bg-color-page);
-}
-
-.message.assistant .message-content {
   background-color: var(--el-color-primary-light-9);
 }
 
-.message.user .message-content {
-  background-color: var(--el-color-success-light-9);
+.message.assistant .message-content {
+  background-color: var(--el-bg-color-page);
 }
 
 .message-text {
@@ -219,16 +242,29 @@ watch(currentMessages, () => {
   word-break: break-word;
 }
 
-.message-time {
+.message-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
-  margin-top: 4px;
-  text-align: right;
+}
+
+.message-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.message:hover .message-actions {
+  opacity: 1;
 }
 
 .input-area {
-  padding: 16px;
-  border-top: 1px solid var(--el-border-color-light);
+  padding: 20px;
+  border-top: 1px solid var(--el-border-color);
   background-color: var(--el-bg-color);
 }
 
@@ -244,42 +280,33 @@ watch(currentMessages, () => {
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 2000;
+  z-index: 1000;
 }
 
-/* Markdown 样式 */
-.message-text :deep(pre) {
-  background-color: var(--el-fill-color-light);
-  border-radius: 4px;
-  padding: 12px;
-  margin: 8px 0;
-  overflow-x: auto;
-}
-
-.message-text :deep(code) {
-  font-family: Monaco, Consolas, Courier New, monospace;
+:deep(.el-button--text) {
   padding: 2px 4px;
-  background-color: var(--el-fill-color-lighter);
-  border-radius: 2px;
 }
 
-.message-text :deep(pre code) {
-  padding: 0;
-  background-color: transparent;
+:deep(pre) {
+  position: relative;
 }
 
-.message-text :deep(p) {
-  margin: 8px 0;
+:deep(pre .copy-button) {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
 }
 
-.message-text :deep(ul), .message-text :deep(ol) {
-  padding-left: 20px;
-  margin: 8px 0;
+:deep(pre:hover .copy-button) {
+  opacity: 1;
 }
 
-.message-text :deep(blockquote) {
-  margin: 8px 0;
-  padding-left: 12px;
+:deep(blockquote) {
+  margin: 16px 0;
+  padding: 0 16px;
+  color: var(--el-text-color-regular);
   border-left: 4px solid var(--el-border-color);
   color: var(--el-text-color-secondary);
 }
