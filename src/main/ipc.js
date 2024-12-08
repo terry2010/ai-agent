@@ -55,21 +55,39 @@ function setupIPC(mainWindow) {
   // 发送消息
   ipcMain.handle('send-message', async (event, { content, model }) => {
     try {
-      // 如果没有指定模型，获取可用模型列表并使用第一个
-      if (!model) {
-        const modelInfo = await ollamaService.listModels()
-        if (!modelInfo?.models?.length) {
-          throw new Error('没有可用的模型')
-        }
-        model = modelInfo.models[0].name
-      }
+      logger.info('Handling send-message request', { model })
       
-      logger.debug('Sending message:', { content: content.substring(0, 100), model })
-      const response = await ollamaService.generateResponse(content, model)
-      logger.debug('Message response received')
-      return { content: response }
+      if (!model) {
+        throw new Error('模型未连接，请检查模型状态')
+      }
+
+      // 检查模型状态
+      try {
+        await ollamaService.checkModel(model)
+      } catch (error) {
+        logger.error('Model check failed:', error)
+        throw new Error('模型未就绪，请重新选择模型')
+      }
+
+      // 设置响应流事件处理
+      const cleanup = ollamaService.on('response-chunk', ({ chunk, done }) => {
+        try {
+          event.sender.send('response-chunk', { chunk, done })
+        } catch (err) {
+          logger.error('Failed to send response chunk:', err)
+        }
+      })
+
+      try {
+        // 生成响应
+        const response = await ollamaService.generateResponse(content, model)
+        return response
+      } finally {
+        // 清理事件监听器
+        cleanup()
+      }
     } catch (error) {
-      logger.error('Error sending message:', error)
+      logger.error('Failed to send message:', error)
       throw error
     }
   })
@@ -84,18 +102,15 @@ function setupIPC(mainWindow) {
     }
   })
 
-  // 获取可用模型列表
+  // 列出可用模型
   ipcMain.handle('list-models', async () => {
     try {
-      logger.info('=== IPC: list-models request started ===')
-      const models = await ollamaService.listModels()
-      logger.info('=== IPC: Models received from Ollama service ===')
-      logger.info('Models data:', JSON.stringify(models, null, 2))
-      logger.info('=== IPC: list-models request completed ===')
-      return models
+      logger.info('Handling list-models request')
+      const result = await ollamaService.listModels()
+      logger.info('Models list fetched successfully:', result)
+      return result
     } catch (error) {
-      logger.error('=== IPC: list-models request failed ===')
-      logger.error('Error details:', error)
+      logger.error('Failed to list models:', error)
       throw error
     }
   })

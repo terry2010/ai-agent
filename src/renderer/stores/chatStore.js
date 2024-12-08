@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { useModelStore } from './modelStore' // Import modelStore
+import { ref } from 'vue'
+import { useModelStore } from './modelStore'
 
 export const useChatStore = defineStore('chat', {
   state: () => ({
@@ -37,38 +37,6 @@ export const useChatStore = defineStore('chat', {
       return newConversation
     },
 
-    createNewConversation() {
-      return this.createConversation()
-    },
-
-    selectConversation(id) {
-      const conversation = this.conversations.find(conv => conv.id === id)
-      if (conversation) {
-        this.currentConversationId = id
-        this.saveToLocalStorage()
-      }
-    },
-
-    updateConversationTitle(id, title) {
-      const conversation = this.conversations.find(conv => conv.id === id)
-      if (conversation) {
-        conversation.title = title
-        conversation.updatedAt = new Date().toISOString()
-        this.saveToLocalStorage()
-      }
-    },
-
-    deleteConversation(id) {
-      const index = this.conversations.findIndex(conv => conv.id === id)
-      if (index !== -1) {
-        this.conversations.splice(index, 1)
-        if (this.currentConversationId === id) {
-          this.currentConversationId = this.conversations[0]?.id || null
-        }
-        this.saveToLocalStorage()
-      }
-    },
-
     async addMessage(content, role = 'user') {
       if (!this.currentConversation) {
         this.createConversation()
@@ -82,36 +50,42 @@ export const useChatStore = defineStore('chat', {
       }
 
       const conversation = this.conversations.find(conv => conv.id === this.currentConversationId)
-      if (conversation) {
-        conversation.messages.push(message)
-        conversation.updatedAt = new Date().toISOString()
-        this.saveToLocalStorage()
+      if (!conversation) {
+        throw new Error('当前会话不存在')
       }
 
-      if (role === 'user') {
-        try {
-          this.isLoading = true
-          this.error = null
+      conversation.messages.push(message)
+      conversation.updatedAt = new Date().toISOString()
+      this.saveToLocalStorage()
 
+      if (role === 'user') {
+        this.isLoading = true
+        this.error = null
+
+        try {
           // 从 modelStore 获取当前选择的模型
           const modelStore = useModelStore()
-          const currentModel = modelStore.currentModel || null
+          if (!modelStore.currentModel) {
+            throw new Error('请先选择一个模型')
+          }
 
-          const response = await window.api.sendMessage(content, currentModel)
-          await this.addMessage(response.content, 'assistant')
+          // 发送消息给模型
+          await window.api.sendMessage(content, modelStore.currentModel)
         } catch (err) {
           this.error = err.message
+          throw err
         } finally {
           this.isLoading = false
         }
       }
+
+      return message
     },
 
     async checkModelStatus() {
       try {
-        // 这里应该调用实际的模型检查逻辑
-        // 暂时返回 true
-        return true
+        const status = await window.api.checkConnection()
+        return status.connected
       } catch (error) {
         console.error('Failed to check model status:', error)
         return false
@@ -119,36 +93,27 @@ export const useChatStore = defineStore('chat', {
     },
 
     loadFromLocalStorage() {
-      console.log('loadFromLocalStorage called')
       try {
-        const savedData = localStorage.getItem('chat-conversations')
-        const savedCurrentId = localStorage.getItem('chat-current-id')
-        
-        if (savedData) {
-          this.conversations = JSON.parse(savedData)
-          
-          // 如果有保存的当前会话ID且该会话仍然存在，则使用它
-          if (savedCurrentId && this.conversations.find(conv => conv.id === Number(savedCurrentId))) {
-            this.currentConversationId = Number(savedCurrentId)
-          } 
-          // 否则使用最后一个会话
-          else if (this.conversations.length > 0) {
-            this.currentConversationId = this.conversations[this.conversations.length - 1].id
-          }
+        const data = localStorage.getItem('chat-store')
+        if (data) {
+          const parsed = JSON.parse(data)
+          this.conversations = parsed.conversations || []
+          this.currentConversationId = parsed.currentConversationId
         }
-      } catch (err) {
-        console.error('Failed to load from localStorage:', err)
-        this.error = '加载聊天历史失败'
+      } catch (error) {
+        console.error('Failed to load from localStorage:', error)
       }
     },
 
     saveToLocalStorage() {
       try {
-        localStorage.setItem('chat-conversations', JSON.stringify(this.conversations))
-        localStorage.setItem('chat-current-id', this.currentConversationId)
-      } catch (err) {
-        console.error('Failed to save to localStorage:', err)
-        this.error = '保存聊天记录失败'
+        const data = {
+          conversations: this.conversations,
+          currentConversationId: this.currentConversationId
+        }
+        localStorage.setItem('chat-store', JSON.stringify(data))
+      } catch (error) {
+        console.error('Failed to save to localStorage:', error)
       }
     },
 
@@ -157,7 +122,7 @@ export const useChatStore = defineStore('chat', {
       this.currentConversationId = null
       this.isLoading = false
       this.error = null
-      this.saveToLocalStorage()
+      localStorage.removeItem('chat-store')
     }
   }
 })
@@ -166,10 +131,6 @@ export const useChatStore = defineStore('chat', {
 if (process.env.NODE_ENV === 'development') {
   const storeActions = [
     'createConversation',
-    'createNewConversation',
-    'selectConversation',
-    'updateConversationTitle',
-    'deleteConversation',
     'addMessage',
     'checkModelStatus',
     'loadFromLocalStorage',

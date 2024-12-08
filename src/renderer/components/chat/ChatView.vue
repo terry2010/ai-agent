@@ -2,37 +2,47 @@
   <div class="chat-container">
     <!-- 消息列表区域 -->
     <div class="message-list" ref="messageListRef">
-      <el-scrollbar>
-        <div class="message-wrapper">
-          <div v-for="message in currentMessages" 
-               :key="message.id" 
-               class="message"
-               :class="message.role">
-            <div class="message-content">
-              <div class="message-text" v-html="renderMarkdown(message.content)"></div>
-              <div class="message-footer">
-                <div class="message-time">{{ formatTime(message.timestamp) }}</div>
-                <div class="message-actions">
-                  <el-tooltip content="复制消息" placement="top" :hide-after="1000">
-                    <el-button type="text" @click="copyMessage(message)">
-                      <i class="el-icon-document-copy" />
-                    </el-button>
-                  </el-tooltip>
-                  <el-tooltip v-if="message.role === 'user'" content="重新发送" placement="top" :hide-after="1000">
-                    <el-button type="text" @click="resendMessage(message)">
-                      <i class="el-icon-refresh" />
-                    </el-button>
-                  </el-tooltip>
-                </div>
-              </div>
+      <template v-for="message in currentMessages" :key="message.id">
+        <div class="message" :class="message.role">
+          <div class="message-content" v-html="renderMarkdown(message.content || '')"></div>
+          <div class="message-footer">
+            <div class="message-time">{{ formatTime(message.timestamp) }}</div>
+            <div class="message-actions">
+              <el-tooltip content="复制消息" placement="top" :hide-after="1000">
+                <el-button type="text" @click="copyMessage(message)">
+                  <i class="el-icon-document-copy" />
+                </el-button>
+              </el-tooltip>
+              <el-tooltip v-if="message.role === 'user'" content="重新发送" placement="top" :hide-after="1000">
+                <el-button type="text" @click="resendMessage(message)">
+                  <i class="el-icon-refresh" />
+                </el-button>
+              </el-tooltip>
             </div>
           </div>
         </div>
-      </el-scrollbar>
+      </template>
     </div>
 
     <!-- 输入区域 -->
     <div class="input-area">
+      <div class="model-selector">
+        <el-select
+          v-model="currentModel"
+          placeholder="选择模型"
+          :loading="modelStore.loading"
+          :disabled="isLoading"
+          style="width: 200px">
+          <el-option
+            v-for="model in modelStore.models"
+            :key="model.name"
+            :label="model.name + ' (' + formatSize(model.size) + ')'"
+            :value="model.name">
+            <span>{{ model.name }}</span>
+            <span class="model-size">{{ formatSize(model.size) }}</span>
+          </el-option>
+        </el-select>
+      </div>
       <el-input
         v-model="inputMessage"
         type="textarea"
@@ -48,7 +58,7 @@
           type="primary" 
           @click="sendMessage" 
           :loading="isLoading"
-          :disabled="!inputMessage.trim() || isLoading">
+          :disabled="!inputMessage.trim() || isLoading || !currentModel">
           发送
         </el-button>
         <el-button @click="clearInput" :disabled="!inputMessage || isLoading">
@@ -70,64 +80,121 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, onMounted, nextTick, watch, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '@/stores/chatStore'
 import { useModelStore } from '@/stores/modelStore'
-import MarkdownIt from 'markdown-it'
+import { ElMessage } from 'element-plus'
+import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
-import { ElMessage } from 'element-plus'
 
-// 初始化stores
 const chatStore = useChatStore()
 const modelStore = useModelStore()
 
-console.log('ChatView setup - chatStore:', chatStore)
-console.log('ChatView setup - store methods:', Object.keys(chatStore))
-
 // 使用 storeToRefs 来保持响应性
-const { conversations, currentMessages, isLoading, error } = storeToRefs(chatStore)
-const { currentConversation } = storeToRefs(chatStore)
+const { currentMessages, isLoading, error: chatError } = storeToRefs(chatStore)
+const { currentModel, error: modelError, isConnected } = storeToRefs(modelStore)
 
-// Markdown渲染配置
-const md = new MarkdownIt({
-  highlight: function (str, lang) {
+// 当前正在生成的消息
+const currentGeneratingMessage = ref(null)
+
+// 监听消息内容变化，自动滚动到底部
+watch(() => currentMessages.value?.length, () => {
+  scrollToBottom()
+}, { deep: true })
+
+watch(() => currentGeneratingMessage.value?.content, () => {
+  scrollToBottom()
+}, { deep: true })
+
+// 配置 marked
+marked.setOptions({
+  highlight: function (code, lang) {
     if (lang && hljs.getLanguage(lang)) {
       try {
-        const highlighted = hljs.highlight(str, { language: lang, ignoreIllegals: true }).value
-        return `<pre><code class="hljs language-${lang}">${highlighted}</code><button class="copy-button el-button el-button--text" onclick="navigator.clipboard.writeText(\`${str.replace(/`/g, '\\`')}\`).then(() => { const el = document.createElement('span'); el.textContent = '已复制'; el.style.position = 'absolute'; el.style.right = '8px'; el.style.top = '8px'; this.replaceWith(el); setTimeout(() => el.remove(), 1000); })"><i class="el-icon-document-copy"></i></button></pre>`
-      } catch (__) {}
+        return hljs.highlight(code, { language: lang }).value
+      } catch (err) {
+        console.error('Failed to highlight code:', err)
+      }
     }
-    return '<pre><code class="hljs">' + md.utils.escapeHtml(str) + '</code></pre>'
-  }
+    return code
+  },
+  breaks: true,
+  gfm: true
 })
-
-// 输入消息
-const inputMessage = ref('')
-const messageListRef = ref(null)
 
 // 渲染 Markdown
 const renderMarkdown = (content) => {
-  return md.render(content)
+  if (!content) return ''
+  try {
+    return marked(content)
+  } catch (err) {
+    console.error('Failed to render markdown:', err)
+    return content
+  }
+}
+
+// 格式化文件大小
+const formatSize = (bytes) => {
+  if (!bytes) return '未知'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let size = bytes
+  let unitIndex = 0
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024
+    unitIndex++
+  }
+  return `${size.toFixed(1)} ${units[unitIndex]}`
+}
+
+// 格式化时间
+const formatTime = (timestamp) => {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  return date.toLocaleTimeString()
+}
+
+// 复制消息内容
+const copyMessage = (message) => {
+  navigator.clipboard.writeText(message.content).then(() => {
+    ElMessage.success('已复制到剪贴板')
+  }).catch(() => {
+    ElMessage.error('复制失败')
+  })
+}
+
+// 重新发送消息
+const resendMessage = async (message) => {
+  inputMessage.value = message.content
+  await sendMessage()
 }
 
 // 发送消息
 const sendMessage = async () => {
-  if (!inputMessage.value.trim() || isLoading.value) return
+  if (!inputMessage.value.trim()) return
   
-  // 检查模型连接状态
-  if (!modelStore.isConnected) {
-    error.value = '模型未连接，请检查模型状态'
-    return
+  try {
+    if (!isConnected.value) {
+      throw new Error('Ollama 服务未连接')
+    }
+    
+    if (!currentModel.value) {
+      throw new Error('请先选择一个模型')
+    }
+    
+    // 创建用户消息
+    await chatStore.addMessage(inputMessage.value, 'user')
+    inputMessage.value = ''
+    
+    // 创建助手消息
+    const assistantMessage = await chatStore.addMessage('', 'assistant')
+    currentGeneratingMessage.value = assistantMessage
+    
+    await scrollToBottom()
+  } catch (err) {
+    ElMessage.error(err.message)
   }
-
-  const message = inputMessage.value
-  inputMessage.value = ''
-
-  await chatStore.addMessage(message)
-  await nextTick()
-  scrollToBottom()
 }
 
 // 清空输入
@@ -141,49 +208,56 @@ const newline = () => {
 }
 
 // 滚动到底部
-const scrollToBottom = () => {
-  if (messageListRef.value) {
-    const scrollbar = messageListRef.value.querySelector('.el-scrollbar__wrap')
-    if (scrollbar) {
-      scrollbar.scrollTop = scrollbar.scrollHeight
-    }
+const scrollToBottom = async () => {
+  await nextTick()
+  const messageList = messageListRef.value
+  if (messageList) {
+    messageList.scrollTop = messageList.scrollHeight
   }
 }
 
-// 格式化时间
-const formatTime = (timestamp) => {
-  if (!timestamp) return ''
-  const date = new Date(timestamp)
-  return date.toLocaleTimeString()
-}
+// 输入消息
+const inputMessage = ref('')
+const messageListRef = ref(null)
 
-// 复制消息内容
-const copyMessage = (message) => {
-  navigator.clipboard.writeText(message.content).then(() => {
-    ElMessage.success('消息已复制到剪贴板')
-  }).catch(() => {
-    ElMessage.error('复制失败')
-  })
-}
+// 监听错误状态
+watch([chatError, modelError], ([newChatError, newModelError]) => {
+  if (newChatError) {
+    ElMessage.error(newChatError)
+  }
+  if (newModelError) {
+    ElMessage.error(newModelError)
+  }
+})
 
-// 重新发送消息
-const resendMessage = async (message) => {
-  inputMessage.value = message.content
-  await sendMessage()
-}
-
-// 组件挂载后初始化
+// 在组件挂载时初始化
 onMounted(async () => {
+  console.log('ChatView mounted')
   try {
-    // 先加载本地存储的会话
-    await chatStore.loadFromLocalStorage()
+    // 获取模型列表
+    console.log('Fetching models...')
+    await modelStore.fetchModels()
+    console.log('Models fetched:', modelStore.models)
     
-    // 只有在没有任何会话时才创建新会话
-    if (conversations.value.length === 0) {
-      await chatStore.createConversation()
-    }
+    // 设置响应流事件监听
+    const cleanup = window.api.onResponseChunk(({ chunk, done }) => {
+      console.log('Response chunk received:', { chunk, done })
+      if (currentGeneratingMessage.value) {
+        currentGeneratingMessage.value.content += chunk
+        if (done) {
+          currentGeneratingMessage.value = null
+          chatStore.saveToLocalStorage() // 保存完整的对话
+        }
+      }
+    })
+    
+    // 组件卸载时清理事件监听器
+    onUnmounted(() => {
+      cleanup()
+    })
   } catch (err) {
-    console.error('初始化失败:', err)
+    console.error('Failed to initialize chat view:', err)
+    ElMessage.error(err.message)
   }
 })
 
@@ -200,6 +274,7 @@ watch(currentMessages, () => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  background-color: var(--el-bg-color);
 }
 
 .message-list {
@@ -213,18 +288,35 @@ watch(currentMessages, () => {
   margin: 0 auto;
 }
 
+.input-area {
+  border-top: 1px solid var(--el-border-color);
+  padding: 20px;
+  background-color: var(--el-bg-color-overlay);
+}
+
+.model-selector {
+  margin-bottom: 10px;
+}
+
+.button-group {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .message {
   margin-bottom: 20px;
   display: flex;
   flex-direction: column;
 }
 
-.message.assistant {
-  align-items: flex-start;
-}
-
 .message.user {
   align-items: flex-end;
+}
+
+.message.assistant {
+  align-items: flex-start;
 }
 
 .message-content {
@@ -234,48 +326,44 @@ watch(currentMessages, () => {
   background-color: var(--el-color-primary-light-9);
 }
 
-.message.assistant .message-content {
-  background-color: var(--el-bg-color-page);
+.message.user .message-content {
+  background-color: var(--el-color-primary);
+  color: white;
 }
 
 .message-text {
-  font-size: 14px;
-  line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .message-footer {
+  margin-top: 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 8px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
 
+.message.user .message-footer {
+  color: var(--el-color-white);
+}
+
 .message-actions {
   display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.message:hover .message-actions {
-  opacity: 1;
-}
-
-.input-area {
-  padding: 20px;
-  border-top: 1px solid var(--el-border-color);
-  background-color: var(--el-bg-color);
-}
-
-.button-group {
-  display: flex;
-  justify-content: flex-end;
   gap: 8px;
-  margin-top: 8px;
+}
+
+.message.user .message-actions :deep(.el-button) {
+  color: var(--el-color-white);
+}
+
+:deep(.markdown-body) {
+  background-color: transparent !important;
+}
+
+:deep(.el-textarea__inner) {
+  resize: none !important;
 }
 
 .error-alert {
@@ -286,31 +374,15 @@ watch(currentMessages, () => {
   z-index: 1000;
 }
 
-:deep(.el-button--text) {
-  padding: 2px 4px;
-}
-
-:deep(pre) {
-  position: relative;
-}
-
-:deep(pre .copy-button) {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-:deep(pre:hover .copy-button) {
-  opacity: 1;
-}
-
-:deep(blockquote) {
-  margin: 16px 0;
-  padding: 0 16px;
-  color: var(--el-text-color-regular);
-  border-left: 4px solid var(--el-border-color);
+.model-size {
+  float: right;
   color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+:deep(.el-select-dropdown__item) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 </style>

@@ -28,5 +28,14 @@ contextBridge.exposeInMainWorld('api', {
     return () => {
       ipcRenderer.removeListener('model-status-changed', handler)
     }
+  },
+  
+  // 流式响应监听
+  onResponseChunk: (callback) => {
+    const handler = (_, data) => callback(data)
+    ipcRenderer.on('response-chunk', handler)
+    return () => {
+      ipcRenderer.removeListener('response-chunk', handler)
+    }
   }
 })
