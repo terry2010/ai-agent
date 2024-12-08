@@ -1,0 +1,59 @@
+/* 浅色主题 */
+[data-theme='light'] {
+  --bg-color: #f5f7fa;
+  --text-color: #303133;
+  --border-color: #dcdfe6;
+  --primary-color: #409eff;
+  --success-color: #67c23a;
+  --warning-color: #e6a23c;
+  --danger-color: #f56c6c;
+  --hover-color: #ecf5ff;
+}
+
+/* 深色主题 */
+[data-theme='dark'] {
+  --bg-color: #1e1e1e;
+  --text-color: #e5eaf3;
+  --border-color: #4c4d4f;
+  --primary-color: #409eff;
+  --success-color: #67c23a;
+  --warning-color: #e6a23c;
+  --danger-color: #f56c6c;
+  --hover-color: #18222c;
+}
+
+/* 基础样式 */
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+.el-button {
+  border-color: var(--border-color);
+}
+
+.el-input__inner {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+.el-menu {
+  background-color: transparent;
+}
+
+.el-menu-item:hover {
+  background-color: var(--hover-color);
+}
+
+.el-dialog {
+  background-color: var(--bg-color);
+}
+
+.el-tabs__item {
+  color: var(--text-color);
+}
+
+.el-form-item__label {
+  color: var(--text-color);
+}

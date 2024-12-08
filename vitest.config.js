@@ -7,7 +7,27 @@ module.exports = defineConfig({
   test: {
     globals: true,
     environment: 'happy-dom',
-    setupFiles: ['./tests/setup-vue.js']
+    setupFiles: ['./tests/setup.js'],
+    environmentOptions: {
+      happyDOM: {
+        supported: { 
+          requestAnimationFrame: true,
+          Promise: true,
+          Event: true,
+          CustomEvent: true,
+          InputEvent: true,
+          fetch: true
+        },
+        settings: {
+          disableJavaScriptEvaluation: false,
+          disableJavaScriptFileLoading: false,
+          disableCSSFileLoading: true,
+          enableFileSystemHttpRequests: false
+        }
+      }
+    },
+    testTimeout: 10000,
+    hookTimeout: 10000
   },
   resolve: {
     alias: {

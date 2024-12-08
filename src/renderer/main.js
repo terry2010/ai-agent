@@ -5,10 +5,15 @@ import 'element-plus/dist/index.css'
 import './styles/theme.css'
 import App from './App.vue'
 
+// 创建应用实例
 const app = createApp(App)
 
-// 使用插件
-app.use(ElementPlus)
-app.use(createPinia())
+// 使用 Pinia
+const pinia = createPinia()
+app.use(pinia)
 
+// 使用 Element Plus
+app.use(ElementPlus)
+
+// 挂载应用
 app.mount('#app')

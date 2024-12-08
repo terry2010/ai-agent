@@ -1,8 +1,33 @@
 import { mount } from '@vue/test-utils'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import ChatMessage from '@/renderer/components/ChatMessage.vue'
 
+// Mock md-editor-v3 component
+vi.mock('md-editor-v3', () => ({
+  MdPreview: {
+    name: 'MdPreview',
+    props: ['modelValue'],
+    template: '<div class="md-preview">{{ modelValue }}</div>'
+  }
+}))
+
+// Mock CSS imports
+vi.mock('md-editor-v3/lib/preview.css', () => ({}))
+
 describe('ChatMessage.vue', () => {
+  beforeEach(() => {
+    // Reset mocks before each test
+    vi.clearAllMocks()
+    
+    // Mock fetch for external resources
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve('/* mocked css */')
+      })
+    )
+  })
+
   it('renders message content correctly', () => {
     const wrapper = mount(ChatMessage, {
       props: {
@@ -57,6 +82,9 @@ describe('ChatMessage.vue', () => {
       }
     })
     expect(wrapper.find('.time').exists()).toBe(true)
-    expect(wrapper.find('.time').text()).toMatch(/\d{1,2}:\d{2}:\d{2}/)
+    
+    // Use a more flexible time format check since locale might differ
+    const timeText = wrapper.find('.time').text()
+    expect(timeText).toMatch(/\d{1,2}[:\.]\d{2}[:\.]\d{2}/)
   })
 })
