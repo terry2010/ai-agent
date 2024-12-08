@@ -68,8 +68,12 @@ import 'highlight.js/styles/github.css'
 const chatStore = useChatStore()
 const modelStore = useModelStore()
 
+console.log('ChatView setup - chatStore:', chatStore)
+console.log('ChatView setup - store methods:', Object.keys(chatStore))
+
 // 使用 storeToRefs 来保持响应性
-const { currentMessages, isLoading, error } = storeToRefs(chatStore)
+const { conversations, currentMessages, isLoading, error } = storeToRefs(chatStore)
+const { currentConversation } = storeToRefs(chatStore)
 
 // 初始化 markdown-it
 const md = new MarkdownIt({
@@ -140,30 +144,24 @@ const formatTime = (timestamp) => {
   return date.toLocaleTimeString()
 }
 
-// 监听消息变化，自动滚动到底部
-watch(() => currentMessages, () => {
-  nextTick(() => {
-    scrollToBottom()
-  })
-}, { deep: true })
-
 // 组件挂载后初始化
 onMounted(async () => {
   try {
-    // 加载历史记录
-    await chatStore.loadFromLocalStorage()
-    
-    // 检查模型状态
-    await modelStore.checkConnection()
-    
     // 如果没有当前对话，创建新对话
-    if (!chatStore.currentConversation) {
-      chatStore.createConversation()
+    if (!currentConversation.value) {
+      await chatStore.createConversation()
     }
   } catch (err) {
     console.error('初始化失败:', err)
   }
 })
+
+// 监听消息变化，自动滚动到底部
+watch(currentMessages, () => {
+  nextTick(() => {
+    scrollToBottom()
+  })
+}, { deep: true })
 </script>
 
 <style>

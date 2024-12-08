@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
 
 export const useChatStore = defineStore('chat', {
   state: () => ({
@@ -9,11 +10,12 @@ export const useChatStore = defineStore('chat', {
   }),
 
   getters: {
-    currentConversation(state) {
-      return state.conversations.find(conv => conv.id === state.currentConversationId)
-    },
-    currentMessages(state) {
-      return this.currentConversation?.messages || []
+    currentConversation: (state) => 
+      state.conversations.find(conv => conv.id === state.currentConversationId),
+    
+    currentMessages: (state) => {
+      const conversation = state.conversations.find(conv => conv.id === state.currentConversationId)
+      return conversation?.messages || []
     }
   },
 
@@ -29,14 +31,20 @@ export const useChatStore = defineStore('chat', {
       
       this.conversations.push(newConversation)
       this.currentConversationId = newConversation.id
+      this.saveToLocalStorage()
       
       return newConversation
+    },
+
+    createNewConversation() {
+      return this.createConversation()
     },
 
     selectConversation(id) {
       const conversation = this.conversations.find(conv => conv.id === id)
       if (conversation) {
         this.currentConversationId = id
+        this.saveToLocalStorage()
       }
     },
 
@@ -45,6 +53,7 @@ export const useChatStore = defineStore('chat', {
       if (conversation) {
         conversation.title = title
         conversation.updatedAt = new Date().toISOString()
+        this.saveToLocalStorage()
       }
     },
 
@@ -55,6 +64,7 @@ export const useChatStore = defineStore('chat', {
         if (this.currentConversationId === id) {
           this.currentConversationId = this.conversations[0]?.id || null
         }
+        this.saveToLocalStorage()
       }
     },
 
@@ -70,8 +80,12 @@ export const useChatStore = defineStore('chat', {
         timestamp: new Date().toISOString()
       }
 
-      this.currentConversation.messages.push(message)
-      this.currentConversation.updatedAt = new Date().toISOString()
+      const conversation = this.conversations.find(conv => conv.id === this.currentConversationId)
+      if (conversation) {
+        conversation.messages.push(message)
+        conversation.updatedAt = new Date().toISOString()
+        this.saveToLocalStorage()
+      }
 
       if (role === 'user') {
         try {
@@ -79,7 +93,7 @@ export const useChatStore = defineStore('chat', {
           this.error = null
 
           const response = await window.api.sendMessage(content)
-          this.addMessage(response.content, 'assistant')
+          await this.addMessage(response.content, 'assistant')
         } catch (err) {
           this.error = err.message
         } finally {
@@ -88,7 +102,19 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async loadFromLocalStorage() {
+    async checkModelStatus() {
+      try {
+        // 这里应该调用实际的模型检查逻辑
+        // 暂时返回 true
+        return true
+      } catch (error) {
+        console.error('Failed to check model status:', error)
+        return false
+      }
+    },
+
+    loadFromLocalStorage() {
+      console.log('loadFromLocalStorage called')
       try {
         const savedData = localStorage.getItem('chat-conversations')
         if (savedData) {
@@ -97,7 +123,7 @@ export const useChatStore = defineStore('chat', {
         }
       } catch (err) {
         console.error('Failed to load from localStorage:', err)
-        throw err
+        this.error = '加载聊天历史失败'
       }
     },
 
@@ -111,24 +137,29 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    exportConversation(id) {
-      const conversation = this.conversations.find(conv => conv.id === id)
-      if (!conversation) return null
-
-      return {
-        id: conversation.id,
-        title: conversation.title,
-        messages: conversation.messages,
-        createdAt: conversation.createdAt,
-        updatedAt: conversation.updatedAt
-      }
-    },
-
     reset() {
       this.conversations = []
       this.currentConversationId = null
       this.isLoading = false
       this.error = null
+      this.saveToLocalStorage()
     }
   }
 })
+
+// 打印 store 定义
+if (process.env.NODE_ENV === 'development') {
+  const storeActions = [
+    'createConversation',
+    'createNewConversation',
+    'selectConversation',
+    'updateConversationTitle',
+    'deleteConversation',
+    'addMessage',
+    'checkModelStatus',
+    'loadFromLocalStorage',
+    'saveToLocalStorage',
+    'reset'
+  ]
+  console.log('Store defined with actions:', storeActions)
+}
