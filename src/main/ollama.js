@@ -23,11 +23,14 @@ class OllamaService extends EventEmitter {
     // 请求拦截器
     this.client.interceptors.request.use(
       config => {
-        logger.info(`Ollama API Request: ${config.method.toUpperCase()} ${config.url}`)
+        logger.debug(`Making request to ${config.url}`)
         return config
       },
       error => {
-        logger.error('Request error:', error)
+        logger.error('Request interceptor error:', { 
+          message: error.message,
+          code: error.code
+        })
         return Promise.reject(error)
       }
     )
@@ -35,18 +38,27 @@ class OllamaService extends EventEmitter {
     // 响应拦截器
     this.client.interceptors.response.use(
       response => {
-        const responseData = response.data ? JSON.stringify(response.data) : 'no data'
-        logger.info(`Ollama API Response: ${response.status} ${response.statusText}`)
-        logger.info(`Response data: ${responseData}`)
+        logger.debug(`Received response from ${response.config.url}`)
         return response
       },
       error => {
-        logger.error('Response error:', error)
         if (error.response) {
-          const { status, data } = error.response
-          throw new Error(`API Error: ${status} - ${data.error || 'Unknown error'}`)
+          logger.error('Response error:', { 
+            status: error.response.status,
+            data: error.response.data,
+            url: error.config.url
+          })
+        } else if (error.request) {
+          logger.error('Request error:', { 
+            message: error.message,
+            code: error.code
+          })
+        } else {
+          logger.error('Error:', { 
+            message: error.message
+          })
         }
-        throw error
+        return Promise.reject(error)
       }
     )
   }
@@ -82,7 +94,7 @@ class OllamaService extends EventEmitter {
         this.requestQueue.unshift(item)
         logger.warn(`Request failed, retrying... (${item.retries} retries left)`)
       } else {
-        item.reject(error)
+        item.reject(new Error(error.message || '请求失败'))
       }
     } finally {
       this.activeRequests--
@@ -95,7 +107,10 @@ class OllamaService extends EventEmitter {
       const result = await request()
       return result
     } catch (error) {
-      logger.error('Request execution failed:', error)
+      logger.error('Request execution failed:', {
+        message: error.message,
+        code: error.code
+      })
       if (error.code === 'ECONNREFUSED') {
         // 尝试使用备用地址
         if (this.client.defaults.baseURL.includes('localhost')) {
@@ -105,7 +120,7 @@ class OllamaService extends EventEmitter {
         }
         throw new Error('Ollama 服务未运行或无法访问 (端口 11434)')
       }
-      throw error
+      throw new Error(error.message || '请求失败')
     }
   }
 
@@ -167,13 +182,28 @@ class OllamaService extends EventEmitter {
   // 生成响应
   async generateResponse(prompt, model = 'codellama', options = {}) {
     return this.enqueueRequest(async () => {
-      const response = await this.client.post('/api/generate', {
-        model,
-        prompt,
-        stream: true,
-        ...options
-      })
-      return response.data
+      try {
+        const response = await this.client.post('/api/generate', {
+          model,
+          prompt,
+          stream: false,  // 暂时不使用流式响应
+          ...options
+        })
+
+        if (!response.data || !response.data.response) {
+          throw new Error('无效的响应格式')
+        }
+
+        return response.data.response
+      } catch (error) {
+        logger.error('Generate response failed:', {
+          message: error.message,
+          code: error.code,
+          model,
+          prompt: prompt.substring(0, 100) + '...'  // 只记录前100个字符
+        })
+        throw new Error(error.message || '生成响应失败')
+      }
     })
   }
 

@@ -52,6 +52,20 @@ function setupIPC(mainWindow) {
     }
   })
 
+  // 发送消息
+  ipcMain.handle('send-message', async (event, { content }) => {
+    try {
+      logger.debug('Sending message:', content)
+      const settings = store.get('settings')
+      const response = await ollamaService.generateResponse(content, settings.defaultModel)
+      logger.debug('Message response received')
+      return { content: response }
+    } catch (error) {
+      logger.error('Error sending message:', error)
+      throw error
+    }
+  })
+
   // 检查模型状态
   ipcMain.handle('check-model', async (_, modelId) => {
     try {
