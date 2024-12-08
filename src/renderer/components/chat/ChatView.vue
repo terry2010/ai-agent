@@ -175,8 +175,11 @@ const resendMessage = async (message) => {
 // 组件挂载后初始化
 onMounted(async () => {
   try {
-    // 如果没有当前对话，创建新对话
-    if (!currentConversation.value) {
+    // 先加载本地存储的会话
+    await chatStore.loadFromLocalStorage()
+    
+    // 只有在没有任何会话时才创建新会话
+    if (conversations.value.length === 0) {
       await chatStore.createConversation()
     }
   } catch (err) {

@@ -26,7 +26,7 @@ let store;
   }
 })();
 
-function setupIPC() {
+function setupIPC(mainWindow) {
   logger.info('Setting up IPC handlers')
 
   // 检查 Ollama 服务状态
@@ -42,11 +42,64 @@ function setupIPC() {
     }
   })
 
+  // 检查连接状态
+  ipcMain.handle('check-connection', async () => {
+    try {
+      return await ollamaService.checkStatus()
+    } catch (error) {
+      logger.error('Connection check failed:', error)
+      return { connected: false, error: error.message }
+    }
+  })
+
+  // 检查模型状态
+  ipcMain.handle('check-model', async (_, modelId) => {
+    try {
+      return await ollamaService.checkModelHealth(modelId)
+    } catch (error) {
+      logger.error(`Model check failed for ${modelId}:`, error)
+      return { available: false, error: error.message }
+    }
+  })
+
+  // 获取可用模型列表
+  ipcMain.handle('list-models', async () => {
+    try {
+      const models = await ollamaService.listModels()
+      return { models }
+    } catch (error) {
+      logger.error('List models failed:', error)
+      throw error
+    }
+  })
+
+  // 拉取新模型
+  ipcMain.handle('pull-model', async (_, modelId) => {
+    try {
+      const result = await ollamaService.pullModel(modelId)
+      return result
+    } catch (error) {
+      logger.error(`Pull model failed for ${modelId}:`, error)
+      throw error
+    }
+  })
+
+  // 删除模型
+  ipcMain.handle('delete-model', async (_, modelId) => {
+    try {
+      const result = await ollamaService.deleteModel(modelId)
+      return result
+    } catch (error) {
+      logger.error(`Delete model failed for ${modelId}:`, error)
+      throw error
+    }
+  })
+
   // 生成 AI 响应
-  ipcMain.handle('generate-response', async (event, { prompt, model }) => {
+  ipcMain.handle('generate-response', async (event, { prompt, model, options }) => {
     try {
       logger.debug(`Generating response for model: ${model}`)
-      const response = await ollamaService.generateResponse(prompt, model)
+      const response = await ollamaService.generateResponse(prompt, model, options)
       logger.info('Response generated successfully')
       return response
     } catch (error) {
@@ -114,9 +167,41 @@ function setupIPC() {
     }
   })
 
-  logger.info('IPC handlers setup completed')
+  // 设置模型状态变更监听
+  ollamaService.on('modelStatusChanged', (modelId, status) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('model-status-changed', { modelId, status })
+    }
+  })
+
+  // 启动模型健康检查
+  ollamaService.startHealthCheck()
+
+  // 清理函数
+  return () => {
+    ollamaService.stopHealthCheck()
+    ollamaService.removeAllListeners('modelStatusChanged')
+  }
+}
+
+// 预加载脚本API
+const preloadApi = {
+  checkConnection: () => ipcMain.invoke('check-connection'),
+  checkModel: (modelId) => ipcMain.invoke('check-model', modelId),
+  listModels: () => ipcMain.invoke('list-models'),
+  pullModel: (modelId) => ipcMain.invoke('pull-model', modelId),
+  deleteModel: (modelId) => ipcMain.invoke('delete-model', modelId),
+  generateResponse: (params) => ipcMain.invoke('generate-response', params),
+  onModelStatusChange: (callback) => {
+    const { ipcRenderer } = require('electron')
+    ipcRenderer.on('model-status-changed', (_, data) => callback(data.modelId, data.status))
+    return () => {
+      ipcRenderer.removeAllListeners('model-status-changed')
+    }
+  }
 }
 
 module.exports = {
-  setupIPC
+  setupIPC,
+  preloadApi
 }

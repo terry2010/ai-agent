@@ -117,9 +117,19 @@ export const useChatStore = defineStore('chat', {
       console.log('loadFromLocalStorage called')
       try {
         const savedData = localStorage.getItem('chat-conversations')
+        const savedCurrentId = localStorage.getItem('chat-current-id')
+        
         if (savedData) {
           this.conversations = JSON.parse(savedData)
-          this.currentConversationId = localStorage.getItem('chat-current-id')
+          
+          // 如果有保存的当前会话ID且该会话仍然存在，则使用它
+          if (savedCurrentId && this.conversations.find(conv => conv.id === Number(savedCurrentId))) {
+            this.currentConversationId = Number(savedCurrentId)
+          } 
+          // 否则使用最后一个会话
+          else if (this.conversations.length > 0) {
+            this.currentConversationId = this.conversations[this.conversations.length - 1].id
+          }
         }
       } catch (err) {
         console.error('Failed to load from localStorage:', err)

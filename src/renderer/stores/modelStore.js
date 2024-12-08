@@ -8,6 +8,8 @@ export const useModelStore = defineStore('model', () => {
   const error = ref('') // 错误信息
   const retryCount = ref(0) // 重试次数
   const maxRetries = 3 // 最大重试次数
+  const modelStatuses = ref({}) // 模型状态缓存
+  const isLoading = ref(false) // 加载状态
 
   // 错误类型枚举
   const ErrorTypes = {
@@ -18,11 +20,7 @@ export const useModelStore = defineStore('model', () => {
   }
 
   // 可用模型列表
-  const availableModels = ref([
-    { id: 'codellama', name: 'CodeLlama', description: '代码生成和补全' },
-    { id: 'llama2', name: 'Llama2', description: '通用对话' },
-    { id: 'gpt-4', name: 'GPT-4', description: '高级对话' }
-  ])
+  const availableModels = ref([])
 
   // 计算属性
   const selectedModel = computed(() => {
@@ -30,7 +28,7 @@ export const useModelStore = defineStore('model', () => {
   })
 
   const isConnected = computed(() => status.value === 'connected')
-  const isLoading = computed(() => status.value === 'connecting')
+  const isModelLoading = computed(() => isLoading.value)
 
   // 动作
   const setStatus = (newStatus) => {
@@ -41,10 +39,10 @@ export const useModelStore = defineStore('model', () => {
     }
   }
 
-  const setError = (message) => {
+  const setError = (message, type = ErrorTypes.UNKNOWN) => {
     error.value = message
     setStatus('error')
-    if (retryCount.value < maxRetries) {
+    if (type === ErrorTypes.CONNECTION && retryCount.value < maxRetries) {
       retryCount.value++
       setTimeout(retryConnection, 1000 * retryCount.value)
     }
@@ -52,54 +50,109 @@ export const useModelStore = defineStore('model', () => {
 
   const setCurrentModel = async (modelId) => {
     try {
-      currentModel.value = modelId
-      setStatus('connecting')
-      error.value = ''
+      isLoading.value = true
+      const modelStatus = await window.api.checkModel(modelId)
       
-      const response = await Promise.race([
-        window.api.checkModel(modelId),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('模型检查超时')), 10000)
-        )
-      ])
+      if (!modelStatus.available) {
+        // 如果模型不可用，尝试拉取
+        await pullModel(modelId)
+      }
 
-      if (response.status === 'ready') {
-        setStatus('connected')
-      } else {
-        setError('模型加载失败')
+      currentModel.value = modelId
+      modelStatuses.value[modelId] = modelStatus
+      setStatus('connected')
+    } catch (err) {
+      setError(err.message, ErrorTypes.MODEL_LOADING)
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const fetchModels = async () => {
+    try {
+      isLoading.value = true
+      const response = await window.api.listModels()
+      availableModels.value = response.models.map(model => ({
+        id: model.name,
+        name: model.name,
+        description: model.details || '无描述',
+        status: modelStatuses.value[model.name] || { available: false }
+      }))
+    } catch (err) {
+      setError(err.message, ErrorTypes.CONNECTION)
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const pullModel = async (modelId) => {
+    try {
+      isLoading.value = true
+      await window.api.pullModel(modelId)
+      await fetchModels() // 刷新模型列表
+    } catch (err) {
+      setError(err.message, ErrorTypes.MODEL_LOADING)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const deleteModel = async (modelId) => {
+    try {
+      isLoading.value = true
+      await window.api.deleteModel(modelId)
+      await fetchModels() // 刷新模型列表
+      
+      if (currentModel.value === modelId) {
+        currentModel.value = ''
       }
     } catch (err) {
-      setError(err.message || '未知错误')
+      setError(err.message, ErrorTypes.UNKNOWN)
+      throw err
+    } finally {
+      isLoading.value = false
     }
   }
 
   const checkConnection = async () => {
     try {
       setStatus('connecting')
-      error.value = ''
+      const response = await window.api.checkConnection()
       
-      const response = await Promise.race([
-        window.api.checkConnection(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('连接检查超时')), 5000)
-        )
-      ])
-
       if (response.connected) {
         setStatus('connected')
+        await fetchModels()
       } else {
-        setError('连接失败')
+        setError('无法连接到 Ollama 服务', ErrorTypes.CONNECTION)
       }
     } catch (err) {
-      setError(err.message || '连接错误')
+      setError(err.message, ErrorTypes.CONNECTION)
     }
   }
 
   const retryConnection = async () => {
-    if (currentModel.value) {
-      await setCurrentModel(currentModel.value)
-    } else {
-      await checkConnection()
+    await checkConnection()
+  }
+
+  // 处理模型状态变更
+  const handleModelStatusChange = (modelId, newStatus) => {
+    modelStatuses.value[modelId] = newStatus
+    
+    // 更新可用模型列表中的状态
+    const modelIndex = availableModels.value.findIndex(m => m.id === modelId)
+    if (modelIndex !== -1) {
+      availableModels.value[modelIndex] = {
+        ...availableModels.value[modelIndex],
+        status: newStatus
+      }
+    }
+  }
+
+  // 初始化监听器
+  const initializeListeners = () => {
+    if (window.api?.onModelStatusChange) {
+      window.api.onModelStatusChange(handleModelStatusChange)
     }
   }
 
@@ -109,24 +162,39 @@ export const useModelStore = defineStore('model', () => {
     status.value = 'disconnected'
     error.value = ''
     retryCount.value = 0
+    modelStatuses.value = {}
+    isLoading.value = false
+    availableModels.value = []
   }
+
+  // 在 store 创建后初始化监听器
+  initializeListeners()
 
   return {
     // 状态
     currentModel,
     status,
     error,
-    isConnected,
-    isLoading,
     availableModels,
+    modelStatuses,
+    isLoading,
+    
+    // 计算属性
     selectedModel,
-
+    isConnected,
+    isModelLoading,
+    
     // 动作
     setCurrentModel,
+    fetchModels,
+    pullModel,
+    deleteModel,
     checkConnection,
     retryConnection,
-    setStatus,
-    setError,
-    reset
+    reset,
+    initializeListeners,
+    
+    // 错误类型
+    ErrorTypes
   }
 })
