@@ -3,7 +3,7 @@
     <!-- 消息列表区域 -->
     <div class="message-list" ref="messageListRef">
       <template v-for="message in currentMessages" :key="message.id">
-        <div class="message" :class="message.role">
+        <div v-if="message.content && message.content.trim()" class="message" :class="message.role">
           <div class="message-content" v-html="renderMarkdown(message.content || '')"></div>
           <div class="message-footer">
             <div class="message-time">{{ formatTime(message.timestamp) }}</div>
@@ -271,44 +271,24 @@ watch(currentMessages, () => {
 
 <style scoped>
 .chat-container {
-  height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: var(--el-bg-color);
+  height: 100%;
+  padding: 20px;
 }
 
 .message-list {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
   padding: 20px;
-}
-
-.message-wrapper {
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.input-area {
-  border-top: 1px solid var(--el-border-color);
-  padding: 20px;
-  background-color: var(--el-bg-color-overlay);
-}
-
-.model-selector {
-  margin-bottom: 10px;
-}
-
-.button-group {
-  margin-top: 10px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  margin-bottom: 20px;
 }
 
 .message {
   margin-bottom: 20px;
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 .message.user {
@@ -322,48 +302,76 @@ watch(currentMessages, () => {
 .message-content {
   max-width: 80%;
   padding: 12px 16px;
-  border-radius: 8px;
-  background-color: var(--el-color-primary-light-9);
+  border-radius: 12px;
+  background-color: #f0f2f5;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .message.user .message-content {
-  background-color: var(--el-color-primary);
+  background-color: #1890ff;
   color: white;
 }
 
-.message-text {
-  white-space: pre-wrap;
-  word-break: break-word;
+.message.assistant .message-content {
+  background-color: #f0f2f5;
+  color: #000;
 }
 
 .message-footer {
-  margin-top: 8px;
+  margin-top: 4px;
   display: flex;
-  justify-content: space-between;
+  gap: 8px;
   align-items: center;
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: #8c8c8c;
+  padding: 0 8px;
 }
 
-.message.user .message-footer {
-  color: var(--el-color-white);
+.message-time {
+  color: #8c8c8c;
+}
+
+.message.user .message-time {
+  color: #8c8c8c;
 }
 
 .message-actions {
   display: flex;
   gap: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
 }
 
-.message.user .message-actions :deep(.el-button) {
-  color: var(--el-color-white);
+.message:hover .message-actions {
+  opacity: 1;
+}
+
+.input-area {
+  margin-top: auto;
+  padding: 20px;
+  background: white;
+  border-top: 1px solid #e8e8e8;
+}
+
+.model-selector {
+  margin-bottom: 12px;
 }
 
 :deep(.markdown-body) {
   background-color: transparent !important;
+  margin: 0;
+  padding: 0;
+}
+
+:deep(.markdown-body pre) {
+  background-color: #282c34;
+  margin: 8px 0;
 }
 
 :deep(.el-textarea__inner) {
   resize: none !important;
+  border-radius: 8px;
 }
 
 .error-alert {

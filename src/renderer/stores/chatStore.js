@@ -85,8 +85,10 @@ export const useChatStore = defineStore('chat', {
           log.response('Model response:', response)
           
           // 添加助手的回复消息
-          if (response && response.response) {
+          if (response && response.response && response.response.trim()) {
             await this.addMessage(response.response, 'assistant')
+          } else {
+            log.error('Empty response from model:', response)
           }
         } catch (err) {
           log.error('Failed to get model response:', err)
