@@ -37,7 +37,7 @@ onMounted(async () => {
   // 检查模型状态
   modelConnected.value = await chatStore.checkModelStatus()
   if (!chatStore.currentConversationId) {
-    chatStore.createNewConversation()
+    chatStore.createConversation()
   }
 })
 
@@ -53,7 +53,7 @@ async function sendMessage() {
 
 // 创建新对话
 function createNewChat() {
-  chatStore.createNewConversation()
+  chatStore.createConversation()
 }
 
 // 选择对话

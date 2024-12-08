@@ -216,6 +216,16 @@ import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 
+// 工具函数：查找数组中最后一个满足条件的元素的索引
+const findLastIndex = (array, predicate) => {
+  for (let i = array.length - 1; i >= 0; i--) {
+    if (predicate(array[i])) {
+      return i
+    }
+  }
+  return -1
+}
+
 const chatStore = useChatStore()
 const modelStore = useModelStore()
 const { currentMessages } = storeToRefs(chatStore)
@@ -285,6 +295,26 @@ const isLatestUserMessageVisible = () => {
   return messageRect.top >= containerRect.top && messageRect.bottom <= containerRect.bottom
 }
 
+// 判断最新的助手消息是否可见
+const isLatestAssistantMessageVisible = () => {
+  const messageList = messageListRef.value
+  if (!messageList) return false
+
+  const messages = currentMessages.value
+  const lastAssistantMessageIndex = findLastIndex(messages, m => m.role === 'assistant')
+  if (lastAssistantMessageIndex === -1) return false
+
+  const messageElements = messageList.$el.querySelectorAll('.message')
+  const lastAssistantMessage = messageElements[lastAssistantMessageIndex]
+  if (!lastAssistantMessage) return false
+
+  const containerRect = messageList.wrapRef.getBoundingClientRect()
+  const messageRect = lastAssistantMessage.getBoundingClientRect()
+
+  // 检查消息底部是否在可视区域内
+  return messageRect.bottom <= containerRect.bottom
+}
+
 // 监听滚动事件
 const onScroll = () => {
   const messageList = messageListRef.value
@@ -293,13 +323,26 @@ const onScroll = () => {
   shouldAutoScroll.value = isNearBottom()
 }
 
-// 监听消息列表变化（包括切换会话）
-watch(() => currentMessages.value, () => {
+// 监听消息列表变化
+watch(() => currentMessages.value, (newMessages, oldMessages) => {
   nextTick(() => {
     const messageList = messageListRef.value
-    if (messageList) {
-      messageList.setScrollTop(messageList.wrapRef.scrollHeight)
+    if (!messageList) return
+
+    // 如果是新增的助手消息
+    if (newMessages?.length > (oldMessages?.length || 0)) {
+      const lastMessage = newMessages[newMessages.length - 1]
+      if (lastMessage?.role === 'assistant') {
+        // 只有当助手最新消息底部可见时，才自动滚动
+        if (isLatestAssistantMessageVisible()) {
+          messageList.setScrollTop(messageList.wrapRef.scrollHeight)
+        }
+        return
+      }
     }
+
+    // 对于其他情况（如用户消息、切换会话等），保持原有逻辑
+    messageList.setScrollTop(messageList.wrapRef.scrollHeight)
   })
 }, { immediate: true, deep: true })
 
