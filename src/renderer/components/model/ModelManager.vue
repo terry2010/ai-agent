@@ -108,6 +108,12 @@ const {
 // 错误弹窗控制
 const showError = ref(false)
 
+// 组件挂载时初始化
+onMounted(async () => {
+  console.log('=== ModelManager: Component mounted ===')
+  await modelStore.fetchModels()
+})
+
 // 获取状态类型
 const getStatusType = (status) => {
   if (!status) return 'info'
@@ -172,13 +178,6 @@ const handleRetry = () => {
 watch(() => error.value, (newError) => {
   if (newError) {
     showError.value = true
-  }
-})
-
-// 组件加载时获取模型列表
-onMounted(async () => {
-  if (isConnected.value) {
-    await refreshModels()
   }
 })
 </script>

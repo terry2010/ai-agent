@@ -6,7 +6,10 @@ const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
-    winston.format.json()
+    winston.format.printf(({ level, message, timestamp, ...rest }) => {
+      const extras = Object.keys(rest).length ? JSON.stringify(rest) : ''
+      return `[${timestamp}] ${level}: ${message} ${extras}`
+    })
   ),
   transports: [
     // 写入所有日志到 combined.log
@@ -26,11 +29,14 @@ const logger = winston.createLogger({
 })
 
 // 在开发环境下同时输出到控制台
-if (process.env.NODE_ENV === 'development') {
+if (process.env.NODE_ENV !== 'production') {
   logger.add(new winston.transports.Console({
     format: winston.format.combine(
       winston.format.colorize(),
-      winston.format.simple()
+      winston.format.printf(({ level, message, timestamp, ...rest }) => {
+        const extras = Object.keys(rest).length ? JSON.stringify(rest) : ''
+        return `[${timestamp}] ${level}: ${message} ${extras}`
+      })
     )
   }))
 }

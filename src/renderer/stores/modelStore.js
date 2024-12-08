@@ -71,14 +71,35 @@ export const useModelStore = defineStore('model', () => {
   const fetchModels = async () => {
     try {
       isLoading.value = true
+      console.log('=== Store: Fetching models started ===')
       const response = await window.api.listModels()
-      availableModels.value = response.models.map(model => ({
+      console.log('=== Store: Received models from IPC ===')
+      console.log('Models:', response)
+      
+      // 确保 response 包含模型数据
+      if (!response || !Array.isArray(response)) {
+        console.error('Invalid response:', response)
+        throw new Error('无效的模型数据')
+      }
+
+      availableModels.value = response.map(model => ({
         id: model.name,
         name: model.name,
         description: model.details || '无描述',
-        status: modelStatuses.value[model.name] || { available: false }
+        status: modelStatuses.value[model.name] || { available: true }
       }))
+
+      console.log('=== Store: Models processed ===')
+      console.log('Processed models:', availableModels.value)
+
+      // 如果没有选择模型，自动选择第一个
+      if (!currentModel.value && availableModels.value.length > 0) {
+        console.log('=== Store: Auto-selecting first model ===')
+        await setCurrentModel(availableModels.value[0].id)
+      }
     } catch (err) {
+      console.error('=== Store: Error fetching models ===')
+      console.error('Error:', err)
       setError(err.message, ErrorTypes.CONNECTION)
     } finally {
       isLoading.value = false
@@ -189,17 +210,12 @@ export const useModelStore = defineStore('model', () => {
   return {
     // 状态
     currentModel,
-    status,
-    error,
     availableModels,
-    modelStatuses,
+    error,
     isLoading,
-    
-    // 计算属性
-    selectedModel,
     isConnected,
-    isModelLoading,
-    
+    selectedModel,
+
     // 动作
     setCurrentModel,
     fetchModels,
@@ -207,10 +223,7 @@ export const useModelStore = defineStore('model', () => {
     deleteModel,
     checkConnection,
     retryConnection,
-    reset,
-    initializeListeners,
-    
-    // 错误类型
-    ErrorTypes
+    handleModelStatusChange,
+    reset
   }
 })

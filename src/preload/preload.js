@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('api', {
   // 连接检查
   checkConnection: () => ipcRenderer.invoke('check-connection'),
+  checkOllamaStatus: () => ipcRenderer.invoke('check-ollama-status'),
   
   // 模型管理
   checkModel: (modelId) => ipcRenderer.invoke('check-model', modelId),

@@ -35,7 +35,9 @@ class OllamaService extends EventEmitter {
     // 响应拦截器
     this.client.interceptors.response.use(
       response => {
+        const responseData = response.data ? JSON.stringify(response.data) : 'no data'
         logger.info(`Ollama API Response: ${response.status} ${response.statusText}`)
+        logger.info(`Response data: ${responseData}`)
         return response
       },
       error => {
@@ -113,13 +115,24 @@ class OllamaService extends EventEmitter {
       try {
         logger.info('Fetching model list from Ollama')
         const response = await this.client.get('/api/tags')
-        logger.info(`Successfully fetched ${response.data.models?.length || 0} models`)
         
-        if (!response.data || !response.data.models) {
-          throw new Error('Invalid response format from Ollama API')
+        // 检查响应格式
+        if (!response || !response.data) {
+          logger.error('Invalid response:', response)
+          throw new Error('Invalid response from Ollama API')
         }
+
+        // 检查模型列表
+        if (!response.data.models || !Array.isArray(response.data.models)) {
+          logger.error('Invalid models data:', response.data)
+          throw new Error('Invalid models data from Ollama API')
+        }
+
+        const models = response.data.models
+        logger.info(`Successfully fetched ${models.length} models`)
+        logger.info('Models:', JSON.stringify(models))
         
-        return response.data.models
+        return models
       } catch (error) {
         logger.error('Failed to fetch models:', error)
         if (error.code === 'ECONNREFUSED') {

@@ -104,7 +104,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useModelStore } from '@/stores/modelStore'
 import { useChatStore } from '@/stores/chatStore'
@@ -121,6 +121,12 @@ const chatToDelete = ref(null)
 
 // 标签页相关
 const activeTab = ref('chat')
+
+// 组件挂载时初始化
+onMounted(async () => {
+  console.log('=== MainLayout: Component mounted ===')
+  await modelStore.fetchModels()
+})
 
 // 处理模型切换
 const handleModelChange = async (modelId) => {
