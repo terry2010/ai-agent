@@ -156,6 +156,37 @@ export const useChatStore = defineStore('chat', {
       this.isLoading = false
       this.error = null
       localStorage.removeItem('chat-store')
+    },
+
+    // 删除会话
+    deleteConversation(conversationId) {
+      const index = this.conversations.findIndex(conv => conv.id === conversationId)
+      if (index !== -1) {
+        this.conversations.splice(index, 1)
+        
+        // 如果删除的是当前会话，切换到其他会话
+        if (this.currentConversationId === conversationId) {
+          this.currentConversationId = this.conversations.length > 0 
+            ? this.conversations[0].id 
+            : null
+        }
+        
+        this.saveToLocalStorage()
+        return true
+      }
+      return false
+    },
+
+    // 选择会话
+    selectConversation(conversationId) {
+      const conversation = this.conversations.find(conv => conv.id === conversationId)
+      if (conversation) {
+        this.currentConversationId = conversationId
+        this.error = null
+        this.saveToLocalStorage()
+        return true
+      }
+      return false
     }
   }
 })
@@ -168,7 +199,9 @@ if (process.env.NODE_ENV === 'development') {
     'checkModelStatus',
     'loadFromLocalStorage',
     'saveToLocalStorage',
-    'reset'
+    'reset',
+    'deleteConversation',
+    'selectConversation'
   ]
   console.log('Store defined with actions:', storeActions)
 }

@@ -50,7 +50,7 @@
                      :key="chat.id" 
                      class="history-item"
                      :class="{ active: chatStore.currentConversationId === chat.id }"
-                     @click="selectChat(chat.id)">
+                     @click="selectConversation(chat.id)">
                   <span class="chat-title">{{ chat.title }}</span>
                   <el-button 
                     type="danger" 
@@ -146,7 +146,7 @@ const createNewChat = () => {
 }
 
 // 选择对话
-const selectChat = (chatId) => {
+const selectConversation = (chatId) => {
   chatStore.selectConversation(chatId)
 }
 
