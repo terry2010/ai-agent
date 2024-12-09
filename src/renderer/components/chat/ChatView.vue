@@ -39,6 +39,18 @@
           class="message-input"
         />
         <div class="button-group">
+          <el-upload
+            class="upload-button"
+            action="#"
+            :auto-upload="false"
+            :show-file-list="false"
+            :on-change="handleFileChange"
+            accept=".txt,.md,.py,.js,.java,.json,.yaml,.xml,.pdf"
+          >
+            <el-button :disabled="isLoading">
+              <i class="el-icon-upload" /> 上传文件
+            </el-button>
+          </el-upload>
           <el-button 
             type="primary" 
             @click="sendMessage" 
@@ -203,6 +215,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.upload-button {
+  margin-right: 8px;
+}
+
+.upload-button .el-upload {
+  width: auto;
 }
 </style>
 
@@ -445,6 +465,52 @@ const copyMessage = (message) => {
 const resendMessage = async (message) => {
   inputMessage.value = message.content
   await sendMessage()
+}
+
+// 文件处理相关
+const handleFileChange = async (uploadFile) => {
+  if (!uploadFile) return
+  
+  const file = uploadFile.raw // 获取原始文件对象
+  if (!file) return
+
+  // 文件大小限制（10MB）
+  const MAX_FILE_SIZE = 10 * 1024 * 1024
+  if (file.size > MAX_FILE_SIZE) {
+    ElMessage.error('文件大小不能超过10MB')
+    return
+  }
+
+  try {
+    const content = await readFileContent(file)
+    // 将文件内容添加到输入框
+    inputMessage.value = `文件名：${file.name}\n内容：\n${content}`
+  } catch (error) {
+    ElMessage.error('读取文件失败：' + error.message)
+  }
+}
+
+// 读取文件内容
+const readFileContent = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    
+    reader.onload = (e) => {
+      resolve(e.target.result)
+    }
+    
+    reader.onerror = (error) => {
+      reject(error)
+    }
+
+    if (file.type === 'application/pdf') {
+      ElMessage.warning('PDF文件支持将在后续版本添加')
+      reject(new Error('暂不支持PDF文件'))
+      return
+    }
+
+    reader.readAsText(file)
+  })
 }
 
 // 配置 marked
